@@ -1,0 +1,3 @@
+[submodule "AdventOfCodeScaffolding"]
+	path = AdventOfCodeScaffolding
+	url = https://github.com/jacobalbano/AdventOfCodeScaffolding.git
