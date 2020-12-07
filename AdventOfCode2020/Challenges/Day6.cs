@@ -50,8 +50,45 @@ namespace AdventOfCode2020.Challenges
 				.Count();
 		}
 
-		/*public override object Part2(string input)
+		public override object Part2(string input)
 		{
-		}*/
+			var lines = input
+				.Split('\n')
+				.Select(x => x.Trim())
+				.ToList();
+
+			var build = "";
+			int count = 0;
+
+			foreach (var line in lines)
+			{
+				if (string.IsNullOrWhiteSpace(line))
+				{
+					if (string.IsNullOrWhiteSpace(build))
+						continue;
+
+					count += CountCommonLetters(build);
+
+					build = "";
+				}
+				else
+					build += line + " ";
+			}
+
+			if (!string.IsNullOrWhiteSpace(build))
+				count += CountCommonLetters(build);
+
+			return count;
+		}
+
+		private int CountCommonLetters(string build)
+		{
+			return build
+				.Split(' ')
+				.Where(x => !string.IsNullOrWhiteSpace(x))
+				.Select(x => x.ToCharArray().AsEnumerable())
+				.Aggregate((a,b)=>a.Intersect(b))
+				.Count();
+		}
 	}
 }
