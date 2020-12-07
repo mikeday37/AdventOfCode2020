@@ -7,10 +7,6 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <Folder Include="Challenges\" />
-  </ItemGroup>
-
-  <ItemGroup>
     <ProjectReference Include="..\AdventOfCodeScaffolding\AdventOfCodeScaffolding.csproj" />
   </ItemGroup>
 
