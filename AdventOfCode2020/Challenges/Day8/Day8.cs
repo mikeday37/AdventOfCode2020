@@ -13,7 +13,7 @@ namespace AdventOfCode2020.Challenges.Day8
 	[Challenge(8, "Handheld Halting")]
 	class Day8Challenge : ChallengeBase
 	{
-		public Instruction ParseInstruction(string x)
+		public static Instruction ParseInstruction(string x)
 		{
 			return new Instruction(
 				x[0] switch {
@@ -26,7 +26,7 @@ namespace AdventOfCode2020.Challenges.Day8
 			);
 		}
 
-		public Instruction[] ParseProgram(string input)
+		public static Instruction[] ParseProgram(string input)
 		{
 			return input
 				.Split('\n')
@@ -35,7 +35,7 @@ namespace AdventOfCode2020.Challenges.Day8
 				.ToArray();
 		}
 
-		public HaltInfo RunProgram(Instruction[] program)
+		public static HaltInfo RunProgram(Instruction[] program)
 		{
 			Registers current = new(), prior = current;
 			var visited = new BitArray(program.Length, false);
