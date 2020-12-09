@@ -13,27 +13,16 @@ namespace AdventOfCode2020.Challenges.Day9
 	[Challenge(9, "Encoding Error - Faster")]
 	class Day9FasterChallenge : ChallengeBase
 	{
-		public override object Part1(string input)
+		static long[] ParseNums(string input)
 		{
-			var nums = input
+			return input
 				.Split('\n')
 				.Where(x => !string.IsNullOrWhiteSpace(x))
 				.Select(x => long.Parse(x))
 				.ToArray();
-			
-			
-			foreach (var at in Enumerable.Range(25, nums.Length - 25))
-			{
-				var preamble = nums[(at - 25)..at];
-				var cur = nums[at];
-				if (!CanSumToFromDistinct(cur, preamble))
-					return cur;
-			}
-
-			return -1;
 		}
 
-		private bool CanSumToFromDistinct(long cur, long[] preamble)
+		static bool CanSumToFromDistinct(long cur, long[] preamble)
 		{
 			// brute force for now
 			foreach (var x in preamble)
@@ -43,78 +32,60 @@ namespace AdventOfCode2020.Challenges.Day9
 			return false;
 		}
 
-		public override object Part2(string input)
+		static long FindTargetValue(long[] nums)
 		{
-			long target = (long)Part1(input); // heh.
-			var nums = /**/input
-				.Split('\n')
-				/*/
-				"100 200 301 402 500 600".Split(' ')
-				/**/
-				.Where(x => !string.IsNullOrWhiteSpace(x))
-				.Select(x => long.Parse(x))
-				.ToArray();
-
-			var range = FindTargetRange(target, nums);
-			if (range != null)
+			foreach (var at in Enumerable.Range(25, nums.Length - 25))
 			{
-				var slice = nums[range.Value];
-				return slice.Min() + slice.Max();
+				var preamble = nums[(at - 25)..at];
+				var cur = nums[at];
+				if (!CanSumToFromDistinct(cur, preamble))
+					return cur;
 			}
 
-			return -1;
+			throw new Exception("No such value found.");
 		}
 
-		static Range? FindTargetRange(long target, long[] nums)
+		static Range FindTargetRange(long target, long[] nums)
 		{
-			//Debug.WriteLine($"\n\n\n=============================\nnums.Length = {nums.Length}\n");
-
-			
+			// consider successively shorter slices, narrowing at both ends simultaneously
 			for (int outerStart = 0, outerEnd = nums.Length - 1; outerStart < outerEnd; outerStart++, outerEnd--)
 			{
-				//Debug.WriteLine($"\n[{outerStart:D4} to {outerEnd:D4}]");
+				static Range inclusiveRange(int a, int b) => a..(b+1); // this is just a little helper for greater clarity where it's used
 
-				long sum = 0;
-
-				void add(int index)
-				{
-					//Debug.WriteLine($"\t+[{index}]");
-					sum += nums[index];
-				}
-
-				void sub(int index)
-				{
-					//Debug.WriteLine($"\t-[{index}]");
-					sum -= nums[index];
-				}
-
-				Range range(int a, int b)
-				{
-					var r = a..(b + 1);
-					//Debug.WriteLine($"\t\t{r}");
-					return r;
-				}
-
-				add(outerStart);
-
+				// within the slice, start from left and grow right, considering as we go
+				long sum = nums[outerStart];
 				for (int i = outerStart + 1; i <= outerEnd; i++)
 				{
-					add(i);
-					//Debug.WriteLine("\t\t?");
+					sum += nums[i];
 					if (sum == target)
-						return range(outerStart, i);
+						return inclusiveRange(outerStart, i);
 				}
 				
+				// then shrink to right
 				for (int i = outerStart; i < outerEnd - 1; i++)
 				{
-					sub(i);
-					//Debug.WriteLine("\t\t?");
+					sum -= nums[i];
 					if (sum == target)
-						return range(i + 1, outerEnd);
+						return inclusiveRange(i + 1, outerEnd);
 				}
 			}
 
-			return null;
+			throw new Exception("No such range found.");
+		}
+
+		public override object Part1(string input)
+		{
+			var nums = ParseNums(input);
+			return FindTargetValue(nums);
+		}
+
+		public override object Part2(string input)
+		{
+			var nums = ParseNums(input);
+			var target = FindTargetValue(nums);
+			var range = FindTargetRange(target, nums);
+			var slice = nums[range];
+			return slice.Min() + slice.Max();
 		}
 	}
 }
