@@ -21,5 +21,10 @@ namespace AdventOfCode2020.Challenges
 					yield return line;
 			}
 		}
+
+		public static IEnumerable<(T, int)> WithIndex<T>(this IEnumerable<T> e)
+		{
+			return e.Select((x,i) => (x,i));
+		}
 	}
 }
