@@ -10,7 +10,7 @@ using System.Threading.Tasks;
 
 namespace AdventOfCode2020.Challenges.Day12
 {
-	[Challenge(12, "_______________")]
+	[Challenge(12, "Rain Risk")]
 	class Day12Challenge : ChallengeBase
 	{
 /*
@@ -68,8 +68,10 @@ and F adds (Waypoint times value) to the Ship's location
 					case 'S': Y += c.Amount; break;
 					case 'E': X += c.Amount; break;
 					case 'W': X -= c.Amount; break;
+
 					case 'L': Heading -= c.Amount; break;
 					case 'R': Heading += c.Amount; break;
+
 					case 'F': Move(c with {C = Heading switch {
 							0 => 'N',
 							90 => 'E',
