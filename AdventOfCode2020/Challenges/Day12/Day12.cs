@@ -100,11 +100,8 @@ and F adds (Waypoint times value) to the Ship's location
 					case 'R': RotateWaypoint(c.Amount); break;
 
 					case 'F':
-						foreach (var n in Enumerable.Range(0, c.Amount))
-						{
-							X += WaypointX;
-							Y += WaypointY;
-						}
+						X += WaypointX * c.Amount;
+						Y += WaypointY * c.Amount;
 						break;
 				}
 			}
