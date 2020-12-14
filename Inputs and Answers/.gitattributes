@@ -1,2 +1,2 @@
-*answers*.txt text=true
-*input*.txt text=false
+*answers*.txt text
+*input*.txt -text
