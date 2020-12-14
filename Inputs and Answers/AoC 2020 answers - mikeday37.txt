@@ -1,0 +1,114 @@
+=========================================
+Advent of Code 2020 - Participant Answers
+=========================================
+
+Event URL: https://adventofcode.com/2020
+Participant: mikeday37
+
+This file is provided in tandem with corresponding puzzle input files
+for the same participant to benefit other participants who wish to test
+their solutions against additional inputs.
+
+Happy Coding and Good Luck!  :D
+
+
+Day 1:
+	Part 1 = 935419
+	Part 2 = 49880012
+
+Day 2:
+	Part 1 = 506
+	Part 2 = 443
+
+Day 3:
+	Part 1 = 265
+	Part 2 = 3154761400
+
+Day 4:
+	Part 1 = 219
+	Part 2 = 127
+
+Day 5:
+	Part 1 = 913
+	Part 2 = 717
+
+Day 6:
+	Part 1 = 6703
+	Part 2 = 3430
+
+Day 7:
+	Part 1 = 355
+	Part 2 = 5312
+
+Day 8:
+	Part 1 = 1446
+	Part 2 = 1403
+
+Day 9:
+	Part 1 = 1398413738
+	Part 2 = 169521051
+
+Day 10:
+	Part 1 = 2775
+	Part 2 = 518344341716992
+
+Day 11:
+	Part 1 = 2368
+	Part 2 = 2124
+
+Day 12:
+	Part 1 = 1496
+	Part 2 = 63843
+
+Day 13:
+	Part 1 = 104
+	Part 2 = 842186186521918
+
+Day 14:
+	Part 1 = 
+	Part 2 = 
+
+Day 15:
+	Part 1 = 
+	Part 2 = 
+
+Day 16:
+	Part 1 = 
+	Part 2 = 
+
+Day 17:
+	Part 1 = 
+	Part 2 = 
+
+Day 18:
+	Part 1 = 
+	Part 2 = 
+
+Day 19:
+	Part 1 = 
+	Part 2 = 
+
+Day 20:
+	Part 1 = 
+	Part 2 = 
+
+Day 21:
+	Part 1 = 
+	Part 2 = 
+
+Day 22:
+	Part 1 = 
+	Part 2 = 
+
+Day 23:
+	Part 1 = 
+	Part 2 = 
+
+Day 24:
+	Part 1 = 
+	Part 2 = 
+
+Day 25:
+	Part 1 = 
+	Part 2 = 
+	
