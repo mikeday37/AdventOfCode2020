@@ -8,6 +8,7 @@ EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{3E866D7B-D796-4189-852F-80A5646CA4D8}"
 	ProjectSection(SolutionItems) = preProject
 		.gitignore = .gitignore
+		fdl-1.2.txt = fdl-1.2.txt
 		LICENSE.txt = LICENSE.txt
 		README.md = README.md
 	EndProjectSection
@@ -17,6 +18,25 @@ EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "AdHocConsole", "AdHocConsole\AdHocConsole.csproj", "{725D2C88-0B32-4D43-A527-AD329A2F3C9B}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "HelpingConsole461", "HelpingConsole461\HelpingConsole461.csproj", "{42FF2B1C-5E45-4228-BBF5-2F1127474E6C}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Inputs and Answers", "Inputs and Answers", "{4B7244A7-9EA3-4072-AE7B-2B1957733781}"
+	ProjectSection(SolutionItems) = preProject
+		Inputs and Answers\.gitattributes = Inputs and Answers\.gitattributes
+		Inputs and Answers\AoC 2020 answers - mikeday37.txt = Inputs and Answers\AoC 2020 answers - mikeday37.txt
+		Inputs and Answers\AoC 2020 day 1 input - mikeday37.txt = Inputs and Answers\AoC 2020 day 1 input - mikeday37.txt
+		Inputs and Answers\AoC 2020 day 10 input - mikeday37.txt = Inputs and Answers\AoC 2020 day 10 input - mikeday37.txt
+		Inputs and Answers\AoC 2020 day 11 input - mikeday37.txt = Inputs and Answers\AoC 2020 day 11 input - mikeday37.txt
+		Inputs and Answers\AoC 2020 day 12 input - mikeday37.txt = Inputs and Answers\AoC 2020 day 12 input - mikeday37.txt
+		Inputs and Answers\AoC 2020 day 13 input - mikeday37.txt = Inputs and Answers\AoC 2020 day 13 input - mikeday37.txt
+		Inputs and Answers\AoC 2020 day 2 input - mikeday37.txt = Inputs and Answers\AoC 2020 day 2 input - mikeday37.txt
+		Inputs and Answers\AoC 2020 day 3 input - mikeday37.txt = Inputs and Answers\AoC 2020 day 3 input - mikeday37.txt
+		Inputs and Answers\AoC 2020 day 4 input - mikeday37.txt = Inputs and Answers\AoC 2020 day 4 input - mikeday37.txt
+		Inputs and Answers\AoC 2020 day 5 input - mikeday37.txt = Inputs and Answers\AoC 2020 day 5 input - mikeday37.txt
+		Inputs and Answers\AoC 2020 day 6 input - mikeday37.txt = Inputs and Answers\AoC 2020 day 6 input - mikeday37.txt
+		Inputs and Answers\AoC 2020 day 7 input - mikeday37.txt = Inputs and Answers\AoC 2020 day 7 input - mikeday37.txt
+		Inputs and Answers\AoC 2020 day 8 input - mikeday37.txt = Inputs and Answers\AoC 2020 day 8 input - mikeday37.txt
+		Inputs and Answers\AoC 2020 day 9 input - mikeday37.txt = Inputs and Answers\AoC 2020 day 9 input - mikeday37.txt
+	EndProjectSection
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
