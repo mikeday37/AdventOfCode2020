@@ -23,6 +23,8 @@ namespace AdventOfCode2020.Challenges.Day9
 			
 			foreach (var at in Enumerable.Range(25, nums.Length - 25))
 			{
+				AllowCancel();
+
 				var preamble = nums[(at - 25)..at];
 				var cur = nums[at];
 				if (!CanSumToFromDistinct(cur, preamble))
