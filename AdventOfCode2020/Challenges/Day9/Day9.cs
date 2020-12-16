@@ -55,6 +55,8 @@ namespace AdventOfCode2020.Challenges.Day9
 			foreach (var start in Enumerable.Range(0, nums.Length))
 				foreach (var end in Enumerable.Range(start + 1, nums.Length - 1 - start))
 				{
+					AllowCancel();
+
 					var suspect = nums[start..end];
 					if (suspect.Sum() == target)
 						return suspect.Min() + suspect.Max();
