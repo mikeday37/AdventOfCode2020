@@ -33,6 +33,18 @@ namespace AdventOfCode2020.Challenges.Day17
 			public int Size => 1 + Max - Min;
 
 			public bool IsValid(int i) => Min <= i && i <= Max;
+
+			public IEnumerable<int> YieldAll()
+			{
+				for (int i = Min; i <= Max; i++)
+					yield return i;
+			}
+
+			public IEnumerable<int> YieldInner()
+			{
+				for (int i = Min + 1; i <= Max - 1; i++)
+					yield return i;
+			}
 		}
 
 		public class NDimensionalGrid<T>
@@ -118,22 +130,86 @@ namespace AdventOfCode2020.Challenges.Day17
 			public NDimensionalGrid(int numDimensions, IReadOnlyList<(int, int)> extent) : this(numDimensions, extent.Select(x => new InclusiveRange(x)).ToList()) {}
 		}
 
+		public void OutputGrid(NDimensionalGrid<bool> grid)
+		{
+			using (Logger.Context("Grid State:"))
+			{
+				var (xe, ye, ze) = (grid.Extent[0], grid.Extent[1], grid.Extent[2]);
+				foreach (var z in ze.YieldInner())
+					using (Logger.Context($"Z = {z}:"))
+						foreach (var y in ye.YieldInner())
+						{	
+							StringBuilder sb = new();
+							foreach (var x in xe.YieldInner())
+								sb.Append(grid[new[]{x,y,z}] ? '#' : '.');
+							Logger.LogLine(sb.ToString());
+						}
+			}
+		}
+
+		IEnumerable<int> NeighborOffsets(NDimensionalGrid<bool> grid)
+		{
+			var originIndex = grid.ToIndex(new[]{0,0,0});
+			for (int x = -1; x <= 1; x++)
+				for (int y = -1; y <= 1; y++)
+					for (int z = -1; z <= 1; z++)
+					{
+						if (x == 0 && y == 0 && z == 0)
+							continue;
+						yield return grid.ToIndex(new[]{x,y,z})-originIndex;
+					}
+		}
+
+		NDimensionalGrid<bool> Iterate(NDimensionalGrid<bool> grid)
+		{
+			var old = grid;
+			grid = new NDimensionalGrid<bool>(old.NumDimensions, old.Extent.Select(x => new InclusiveRange((x.Min - 1, x.Max + 1))).ToList());
+			var sourceOffsets = NeighborOffsets(old).ToArray();
+
+			foreach (var z in old.Extent[2].YieldInner())
+				foreach (var y in old.Extent[1].YieldInner())
+					foreach (var x in old.Extent[0].YieldInner())
+					{
+						var currentCoordinates = new[]{x,y,z};
+						var currentSourceIndex = old.ToIndex(currentCoordinates);
+						int active = 0;
+						for (int i = 0; i < 26; i++)
+							if (old[currentSourceIndex + sourceOffsets[i]])
+								active++;
+						if (old[currentSourceIndex])
+							grid[currentCoordinates] = active == 2 || active == 3;
+						else
+							grid[currentCoordinates] = active == 3;
+					}
+
+			return grid;
+		}
+
 		public override object Part1(string rawInput)
 		{
-			var g = new NDimensionalGrid<bool>(3, new[]{(0,2),(0,3),(0,1)} );
+			var lines = rawInput.ToLines().ToList();
+			var initialHeight = lines.Count;
+			var initialWidth = lines[0].Length;
 
-			void t(int x, int y, int z)
+			var grid = new NDimensionalGrid<bool>(3, new[]{(-1,initialWidth),(-1,initialHeight),(-2,2)} );
+
+			var z = 0;
+			for (int y = 0; y < initialHeight; y++)
 			{
-				var c = new int[3]{x,y,z};
-				var index = g.ToIndex(c);
-				Logger.LogLine($"({string.Join(",",c)}) -> {index}");
+				var line = lines[y];
+				for (int x = 0; x < initialWidth; x++)
+					grid[new[]{x,y,z}] = line[x] == '#';
 			}
+			
+			using (Logger.Context("\nInitial State:"))
+				OutputGrid(grid);
 
-			t(0,0,0);
-			t(2,3,1);
-			t(2,0,0);
-			t(1,1,0);
-			t(0,2,1);
+			foreach (var n in Enumerable.Range(1, 6))
+			{
+				grid = Iterate(grid);
+				using (Logger.Context($"\nAfter {n} cycles:"))
+					OutputGrid(grid);
+			}
 
 			return -1;
 		}
