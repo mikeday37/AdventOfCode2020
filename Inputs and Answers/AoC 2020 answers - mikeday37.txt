@@ -77,8 +77,8 @@ Day 16:
 	Part 2 = 1069784384303
 
 Day 17:
-	Part 1 = 
-	Part 2 = 
+	Part 1 = 295
+	Part 2 = 1972
 
 Day 18:
 	Part 1 = 
