@@ -69,8 +69,8 @@ Day 14:
 	Part 2 = 3260587250457
 
 Day 15:
-	Part 1 = 
-	Part 2 = 
+	Part 1 = 1238
+	Part 2 = 3745954
 
 Day 16:
 	Part 1 = 
