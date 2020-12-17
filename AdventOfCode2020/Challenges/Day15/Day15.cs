@@ -80,11 +80,11 @@ namespace AdventOfCode2020.Challenges.Day15
 		{
 			var game = new MemoryGame(Logger, MemoryGame.ParseInput(input));
 
-			using (Logger.Context("Playing to {turns} turns..."));
-			while (game.NextTurnNumber <= turns)
-				game.SpeakTheNeedful();
+			using (Logger.Context($"Playing to {turns} turns..."))
+				while (game.NextTurnNumber <= turns)
+					game.SpeakTheNeedful();
 			var answer = game.LastSpokenNumber;
-			Logger.LogLine("Done.  Answer = {answer}.");
+			Logger.LogLine($"Done.  Answer = {answer}.");
 			return answer;
 		}
 

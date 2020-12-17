@@ -73,7 +73,7 @@ Day 15:
 	Part 2 = 3745954
 
 Day 16:
-	Part 1 = 
+	Part 1 = 18142
 	Part 2 = 
 
 Day 17:
