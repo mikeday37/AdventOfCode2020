@@ -44,7 +44,7 @@ namespace AdventOfCode2020.Challenges.Day16
 				return new Rule(a[0], b.Select(x => InclusiveRange.Parse(x)));
 			}
 
-			public bool IsValid(int i) => Ranges.All(x => x.IsValid(i));
+			public bool IsValid(int i) => Ranges.Any(x => x.IsValid(i));
 		}
 
 		public record Ticket
@@ -94,9 +94,61 @@ namespace AdventOfCode2020.Challenges.Day16
 				.Sum();
 		}
 
-		public override object Part2(string input)
+		public override object Part2(string rawInput)
 		{
-			return -1;
+			var input = PuzzleInput.Parse(rawInput);
+
+			var goodNearbyTickets = input
+				.NearbyTickets
+				.Where(x => x
+					.Values
+					.All(y => input // all of the values in the ticket...
+						.Rules
+						.Any(z => z.IsValid(y)) // must be valid by at least one rule
+					)
+				)
+				.ToList();
+
+			var fieldCount = goodNearbyTickets.First().Values.Length;
+
+			var fieldValues = Enumerable
+				.Range(0, fieldCount)
+				.Select(i => new {
+					fieldIndex = i,
+					goodTicketValues = goodNearbyTickets
+						.Select(t => t.Values[i])
+						.ToArray()
+				})
+				.ToList();
+
+			var applicableRulesPerField = fieldValues
+				.ToDictionary(
+					x => x.fieldIndex,
+					x => input
+						.Rules
+						.Where(rule => x
+							.goodTicketValues
+							.All(v => rule.IsValid(v))
+						)
+						.ToHashSet()
+				);
+
+			Dictionary<int, Rule> ruleMap = new();
+			foreach (var i in Enumerable.Range(0, fieldCount))
+			{
+				var rule = ruleMap[i] = applicableRulesPerField[i].Single();
+				for (var r = i + 1; r < fieldCount; r++)
+					applicableRulesPerField[r].Remove(rule);
+			}
+
+			var fieldIndicesOfInterest = ruleMap
+				.Where(x => x.Value.Text.StartsWith("departure"))
+				.Select(x => x.Key)
+				.ToList();
+
+			return fieldIndicesOfInterest
+				.Select(x => input.MyTicket.Values[x])
+				.Aggregate((a,b)=>a*b);
 		}
 	}
 }
