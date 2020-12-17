@@ -60,11 +60,8 @@ namespace AdventOfCode2020.Challenges.Day9
 				using (Logger.Context($"start = {start}"))
 				foreach (var end in Enumerable.Range(start + 1, nums.Length - 1 - start))
 				{
-					if (end % 100 == 0)
-					{
+					if (end % 10 == 0)
 						Logger.LogLine($"end = {end}");
-						Thread.Sleep(250);
-					}
 
 					AllowCancel();
 
