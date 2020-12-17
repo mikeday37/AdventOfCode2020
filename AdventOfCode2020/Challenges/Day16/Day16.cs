@@ -98,6 +98,7 @@ namespace AdventOfCode2020.Challenges.Day16
 		{
 			var input = PuzzleInput.Parse(rawInput);
 
+			// determine all the "good" tickets by removing all that have any value which can't match any rule
 			var goodNearbyTickets = input
 				.NearbyTickets
 				.Where(x => x
@@ -109,9 +110,10 @@ namespace AdventOfCode2020.Challenges.Day16
 				)
 				.ToList();
 
-			var fieldCount = goodNearbyTickets.First().Values.Length;
 
-			var fieldValues = Enumerable
+			// for each field, get all the good ticket values for that field
+			var fieldCount = goodNearbyTickets.First().Values.Length;
+			var fieldValues = Enumerable 
 				.Range(0, fieldCount)
 				.Select(i => new {
 					fieldIndex = i,
@@ -121,7 +123,8 @@ namespace AdventOfCode2020.Challenges.Day16
 				})
 				.ToList();
 
-			var applicableRulesPerField = fieldValues
+			// get dict of field index -> all rules for which all values at that index are valid
+			var applicableRulesPerField = fieldValues 
 				.ToDictionary(
 					x => x.fieldIndex,
 					x => input
@@ -133,21 +136,34 @@ namespace AdventOfCode2020.Challenges.Day16
 						.ToHashSet()
 				);
 
+			// there must be a single field which only has one applicable rule,
+			// which we can then remove from availability and put in the rulemap,
+			// and repeat until there's nothing more available.
 			Dictionary<int, Rule> ruleMap = new();
-			foreach (var i in Enumerable.Range(0, fieldCount))
+			while (applicableRulesPerField.Any())
 			{
-				var rule = ruleMap[i] = applicableRulesPerField[i].Single();
-				for (var r = i + 1; r < fieldCount; r++)
-					applicableRulesPerField[r].Remove(rule);
+				var isolated = applicableRulesPerField
+					.First(x => x.Value.Count == 1);
+
+				applicableRulesPerField.Remove(isolated.Key);
+
+				var rule = isolated.Value.Single();
+
+				foreach (var a in applicableRulesPerField)
+					a.Value.Remove(rule);
+
+				ruleMap[isolated.Key] = rule;
 			}
 
+			// then just look up the indices of the field values of interest
 			var fieldIndicesOfInterest = ruleMap
 				.Where(x => x.Value.Text.StartsWith("departure"))
 				.Select(x => x.Key)
 				.ToList();
 
+			// and get the product of the corresponding values on my ticket
 			return fieldIndicesOfInterest
-				.Select(x => input.MyTicket.Values[x])
+				.Select(x => (long)input.MyTicket.Values[x])
 				.Aggregate((a,b)=>a*b);
 		}
 	}
