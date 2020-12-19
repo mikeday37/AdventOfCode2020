@@ -81,7 +81,7 @@ Day 17:
 	Part 2 = 1972
 
 Day 18:
-	Part 1 = 
+	Part 1 = 14208061823964
 	Part 2 = 
 
 Day 19:

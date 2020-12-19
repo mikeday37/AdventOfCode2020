@@ -15,7 +15,7 @@ namespace AdventOfCode2020.Challenges.Day18
 	[Challenge(18, "Operation Order")]
 	class Day18Challenge : ChallengeBase
 	{
-		public enum TokenType {Add, Mult, LeftParen, RightParen, Value};
+		public enum TokenType {None = 0, Add, Mult, LeftParen, RightParen, Value};
 
 		public record Token
 		{
@@ -44,6 +44,7 @@ namespace AdventOfCode2020.Challenges.Day18
 			 *    or one value, without any intervening whitespace.
 			 * 3. all other consecutive token pairs are separated by a single space.
 			 * 4. if a space-split part has length > 1, it is a value either prefixed or suffixed with parentheses.
+			 * 5. all expressions are valid.
 			 * 
 			 */
 
@@ -76,14 +77,83 @@ namespace AdventOfCode2020.Challenges.Day18
 				}
 		}
 
+		private class Block
+		{
+			public Block Parent {get; set;}
+			public IReadOnlyList<object> Parts => parts;
+			public void Add(Token t) => parts.Add(t);
+			public Block Nest()
+			{
+				var child = new Block();
+				child.Parent = this;
+				parts.Add(child);
+				return child;
+			}
+
+			private readonly List<object> parts = new();
+		}
+
+		static Block Blockify(IEnumerable<Token> tokens)
+		{
+			var root = new Block();
+			var cur = root;
+
+			foreach (var token in tokens)
+				switch (token.Type)
+				{
+					case TokenType.LeftParen:   cur = cur.Nest(); break;
+					case TokenType.RightParen:  cur = cur.Parent; break;
+					default:                    cur.Add(token);   break;
+				}
+
+			return root;
+		}
+
+		static long Evaluate(object part)
+		{
+			switch (part)
+			{
+				case Token t when t.Type == TokenType.Value:
+					return t.Value;
+					
+				case Block b:
+					long result = Evaluate(b.Parts[0]);
+					for (int i = 1; i < b.Parts.Count; i += 2)
+					{
+						var op = (Token)b.Parts[i];
+						var rightValue = Evaluate(b.Parts[i+1]);
+						switch (op.Type)
+						{
+							case TokenType.Add: result += rightValue; break;
+							case TokenType.Mult: result *= rightValue; break;
+							default: throw new Exception($"Unexpected op: {op}");
+						}
+					}
+					return result;
+
+				default:
+					throw new Exception($"Unexpected direct part evaluation: {part}");
+			}
+		}
+
 		public override object Part1(string input)
 		{
+			/*
 			foreach (var line in input.ToLines())
 				using (Logger.Context(line))
 					foreach (var token in Tokenize(line))
 						Logger.LogLine(token);
+			*/
 
-			return -1;
+			return input
+				.ToLines()
+				.Select(x => {
+					var tokens = Tokenize(x);
+					var rootBlock = Blockify(tokens);
+					var result = Evaluate(rootBlock);
+					return result;
+				})
+				.Sum();
 		}
 
 		public override object Part2(string input)
