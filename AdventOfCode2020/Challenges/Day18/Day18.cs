@@ -40,10 +40,16 @@ namespace AdventOfCode2020.Challenges.Day18
 			 * assumptions based on review of input and examples:
 			 * 
 			 * 1. all values are single digit.
-			 * 2. parenthesis tokens are only consecutive to other parenthesis tokens of the same direction,
-			 *    or one value, without any intervening whitespace.
+			 * 
+			 * 2. parenthesis tokens only exist in consecutive groups of 1 or more of the same type of parenthesis,
+			 *	  always with one leading or trailing digit.  the placement of the digit is determined by the type of parenthesis,
+			 *	  and there is no whitespace between any characters in the group.
+			 *	  
 			 * 3. all other consecutive token pairs are separated by a single space.
-			 * 4. if a space-split part has length > 1, it is a value either prefixed or suffixed with parentheses.
+			 * 
+			 * 4. as a consequence of all the above, if a space-split part has length > 1,
+			 *    it is a value either prefixed or suffixed with one or more parentheses of one type.
+			 * 
 			 * 5. all expressions are valid.
 			 * 
 			 */
@@ -80,17 +86,19 @@ namespace AdventOfCode2020.Challenges.Day18
 		private class Block
 		{
 			public Block Parent {get; set;}
-			public IReadOnlyList<object> Parts => parts;
-			public void Add(Token t) => parts.Add(t);
+			public List<object> Parts {get;}
+
+			public void Add(Token t) => Parts.Add(t);
+
 			public Block Nest()
 			{
 				var child = new Block();
 				child.Parent = this;
-				parts.Add(child);
+				Parts.Add(child);
 				return child;
 			}
 
-			private readonly List<object> parts = new();
+			public Block() => Parts = new();
 		}
 
 		static Block Blockify(IEnumerable<Token> tokens)
@@ -138,27 +146,64 @@ namespace AdventOfCode2020.Challenges.Day18
 
 		public override object Part1(string input)
 		{
-			/*
-			foreach (var line in input.ToLines())
-				using (Logger.Context(line))
-					foreach (var token in Tokenize(line))
-						Logger.LogLine(token);
-			*/
-
 			return input
 				.ToLines()
 				.Select(x => {
 					var tokens = Tokenize(x);
-					var rootBlock = Blockify(tokens);
-					var result = Evaluate(rootBlock);
+					var root = Blockify(tokens);
+					var result = Evaluate(root);
 					return result;
 				})
 				.Sum();
 		}
 
+		static void ApplyAdvancedPrecedence(Block root)
+		{
+			// do it to all blocks in the tree
+			for (int i = 0; i < root.Parts.Count; i += 2)
+				if (root.Parts[i] is Block subBlock)
+					ApplyAdvancedPrecedence(subBlock);
+
+			// now check all operators in this block
+			var count = root.Parts.Count;
+			for (int i = 1; i < count && count > 3; i += 2)
+				if (root.Parts[i] is Token t && t.Type == TokenType.Add)
+				{
+					// fold the high-precedence operator and its immediate neighbors into a new group replacing the operator,
+					// like this:
+					//
+					//   i          i            i 
+					// L O R  ->  L C O R  ->  C
+					//                         |
+					//                       L O R
+					//
+					// heh...  this would've been a lot easier if I just used nodes with left/right links intead of a List<T>
+					var left = root.Parts[i - 1];
+					var op = root.Parts[i];
+					var right = root.Parts[i + 1];
+					Block child = new();
+					root.Parts.Insert(i, child);
+					root.Parts.RemoveRange(i + 1, 2);
+					root.Parts.RemoveAt(i - 1);
+					child.Parent = root;
+					child.Parts.AddRange(new[]{left, op, right});
+					count -= 2;
+					i -= 2;
+				}
+		}
+
 		public override object Part2(string input)
 		{
-			return -1;
+			return input
+				.ToLines()
+				.Select(x => {
+					var tokens = Tokenize(x);
+					var root = Blockify(tokens);
+					ApplyAdvancedPrecedence(root);
+					var result = Evaluate(root);
+					return result;
+				})
+				.Sum();
 		}
 	}
 }
