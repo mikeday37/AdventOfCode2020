@@ -16,15 +16,15 @@ namespace AdventOfCode2020.Challenges.Day20
 	[Challenge(20, "Jurassic Jigsaw")]
 	class Day20Challenge : ChallengeBase
 	{
-		public enum EdgePlacement {None = 0, Top, Left, Right, Bottom};
+		public enum EdgePlacement { None = 0, Top, Left, Right, Bottom };
 
 		public record Edge
 		{
-			public Tile Tile {get; init;}
+			public Tile Tile { get; init; }
 			public ulong TileID => Tile.ID;
-			public EdgePlacement Placement {get; init;}
-			public int Natural {get; init;} // left to right or top to bottom
-			public int Reversed {get; init;} // right ot left or bottom to top
+			public EdgePlacement Placement { get; init; }
+			public int Natural { get; init; } // left to right or top to bottom
+			public int Reversed { get; init; } // right ot left or bottom to top
 
 			public override string ToString() => $"[{TileID}.{Placement.ToString()[0]}: {RawNatural}]";
 			public string RawNatural => BitsToString(Natural);
@@ -42,7 +42,8 @@ namespace AdventOfCode2020.Challenges.Day20
 			{
 				var natural = CharsToBits(tile.YieldEdgeCharacters(placement));
 				var reversed = CharsToBits(tile.YieldEdgeCharacters(placement).Reverse());
-				return new Edge{
+				return new Edge
+				{
 					Tile = tile,
 					Placement = placement,
 					Natural = natural,
@@ -66,7 +67,7 @@ namespace AdventOfCode2020.Challenges.Day20
 
 		public class Tile
 		{
-			public ulong ID {get; private set;}
+			public ulong ID { get; private set; }
 			public IReadOnlyList<string> RawOriginalData => rawOriginalData;
 			public IReadOnlyDictionary<EdgePlacement, Edge> Edges => edges;
 			private readonly List<string> rawOriginalData = new();
@@ -89,9 +90,9 @@ namespace AdventOfCode2020.Challenges.Day20
 							}
 							curTile = null;
 							continue;
-							
+
 						case var l when l[0] == 'T':
-							curTile = new Tile{ID = ulong.Parse(line[5..^1])};
+							curTile = new Tile { ID = ulong.Parse(line[5..^1]) };
 							continue;
 
 						default:
@@ -104,7 +105,7 @@ namespace AdventOfCode2020.Challenges.Day20
 
 			private void ProcessEdges()
 			{
-				foreach (var placement in new[]{EdgePlacement.Top, EdgePlacement.Left, EdgePlacement.Right, EdgePlacement.Bottom})
+				foreach (var placement in new[] { EdgePlacement.Top, EdgePlacement.Left, EdgePlacement.Right, EdgePlacement.Bottom })
 					edges[placement] = Edge.Parse(this, placement);
 			}
 
@@ -135,7 +136,7 @@ namespace AdventOfCode2020.Challenges.Day20
 			}
 		}
 
-		public class TileAnalyzer
+		public partial class TileAnalyzer
 		{
 			public IReadOnlyDictionary<ulong, Tile> Tiles => tiles;
 			public IReadOnlyList<Tile> CornerTiles => cornerTiles;
@@ -165,13 +166,17 @@ namespace AdventOfCode2020.Challenges.Day20
 					}
 
 				// now get all tiles for which exactly two edges match only their own tile -> they must be the corners
-				cornerTiles = tiles.Values
-					.Where(t => 2 == t.Edges.Values.Count(e =>
+				cornerTiles = TilesWithCountOfEdgesOnlyMatchingSelfEquals(2).ToList();
+			}
+
+			public IEnumerable<Tile> TilesWithCountOfEdgesOnlyMatchingSelfEquals(int matchCount)
+			{
+				return tiles.Values
+					.Where(t => matchCount == t.Edges.Values.Count(e =>
 						1 == edgeValues[e.Natural].Count
 						&&
 						1 == edgeValues[e.Reversed].Count
-					))
-					.ToList();
+					));
 			}
 		}
 
@@ -180,12 +185,70 @@ namespace AdventOfCode2020.Challenges.Day20
 			return new TileAnalyzer(input)
 				.CornerTiles
 				.Select(x => x.ID)
-				.Aggregate(1UL, (a,b) => a*b);
+				.Aggregate(1UL, (a, b) => a * b);
 		}
 
 		public override object Part2(string input)
 		{
-			return -1;
+			var ta = new TileAnalyzer(input);
+			ta.FindSeaMonsters();
+			return ta.WaterRoughness;
+		}
+
+		public partial class TileAnalyzer
+		{
+			public int WaterRoughness => waterRoughness.Value;
+			private int? waterRoughness = null;
+
+			public void FindSeaMonsters()
+			{
+				// edge tiles are like corners but instead of 2, they have just one edge that only matches their tile.
+				var edgeTiles = TilesWithCountOfEdgesOnlyMatchingSelfEquals(1).ToList();
+
+				// interior tiles have no edges that only match their tile
+				var interiorTiles = TilesWithCountOfEdgesOnlyMatchingSelfEquals(0).ToList();
+
+				// start with one corner as the seed, then put all other corners and edge tiles into a bag
+				var seed = cornerTiles[0];
+				var bag = cornerTiles.Skip(1).Concat(edgeTiles).ToList();
+
+				// start the board by placing the seed, oriented as needed, into position (0,0)
+				Board board = new();
+				board.PlaceFirstCorner(seed);
+
+				// grow the seed into a finished border by adding from the bag until the bag is empty
+				void PlaceAllFromBag()
+				{
+					while (bag.Any())
+						foreach (var tile in bag)
+							if (board.TryPlace(tile))
+							{
+								bag.Remove(tile);
+								break;
+							}
+				}
+				PlaceAllFromBag();
+
+				// grow the border into the finished picture by refilling the bag with the interior pieces and repeating the above process
+				bag = interiorTiles.ToList();
+				PlaceAllFromBag();
+			}
+
+			public class PlacedTile
+			{
+			}
+
+			public class Board
+			{
+				public void PlaceFirstCorner(Tile tile)
+				{
+				}
+
+				public bool TryPlace(Tile tile)
+				{
+					throw new NotImplementedException();
+				}
+			}
 		}
 	}
 }
