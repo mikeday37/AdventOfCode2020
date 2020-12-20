@@ -164,20 +164,25 @@ namespace AdventOfCode2020.Challenges.Day18
 				if (root.Parts[i] is Block subBlock)
 					ApplyAdvancedPrecedence(subBlock);
 
-			// now check all operators in this block
+			// now check all operators in this block, unless the block is reduced to just three elements (then it's no longer necessary)
 			var count = root.Parts.Count;
 			for (int i = 1; i < count && count > 3; i += 2)
 				if (root.Parts[i] is Token t && t.Type == TokenType.Add)
 				{
-					// fold the high-precedence operator and its immediate neighbors into a new group replacing the operator,
-					// like this:
-					//
-					//   i          i            i 
-					// L O R  ->  L C O R  ->  C
-					//                         |
-					//                       L O R
-					//
-					// heh...  this would've been a lot easier if I just used nodes with left/right links intead of a List<T>
+					/*
+					 * fold the high-precedence operator and its immediate neighbors into a new block replacing the operator.
+					 * 
+					 * like this:
+					 * 
+					 *   i          i            i 
+					 * L O R  ->  L C O R  ->  C
+					 *                         |
+					 *                       L O R
+					 * 
+					 * heh...  this would've been a lot easier if I just used nodes with left/right links intead of a List<T>
+					 *  
+					 */
+
 					var left = root.Parts[i - 1];
 					var op = root.Parts[i];
 					var right = root.Parts[i + 1];
