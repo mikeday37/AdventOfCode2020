@@ -89,7 +89,7 @@ Day 19:
 	Part 2 = 439
 
 Day 20:
-	Part 1 = 
+	Part 1 = 8581320593371
 	Part 2 = 
 
 Day 21:
