@@ -92,8 +92,7 @@ namespace AdventOfCode2020.Challenges.Day18
 
 			public Block Nest()
 			{
-				var child = new Block();
-				child.Parent = this;
+				var child = new Block{Parent = this};
 				Parts.Add(child);
 				return child;
 			}
