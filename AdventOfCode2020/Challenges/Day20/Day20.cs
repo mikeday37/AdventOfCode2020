@@ -16,7 +16,7 @@ namespace AdventOfCode2020.Challenges.Day20
 	[Challenge(20, "Jurassic Jigsaw")]
 	class Day20Challenge : ChallengeBase
 	{
-		public enum EdgePlacement { None = 0, Top, Left, Right, Bottom };
+		public enum EdgePlacement { None = 0, Right = 1, Bottom = 2, Left = 3, Top = 4}; // these values and their order are crucial
 
 		public record Edge
 		{
@@ -142,7 +142,7 @@ namespace AdventOfCode2020.Challenges.Day20
 			public IReadOnlyList<Tile> CornerTiles => cornerTiles;
 
 			private readonly Dictionary<ulong, Tile> tiles;
-			private readonly Dictionary<int, List<(Edge, bool)>> edgeValues;
+			private readonly Dictionary<int, List<(Edge edge, bool reversed)>> edgeValues;
 			private readonly List<Tile> cornerTiles;
 
 			public TileAnalyzer(string input)
@@ -208,45 +208,300 @@ namespace AdventOfCode2020.Challenges.Day20
 				// interior tiles have no edges that only match their tile
 				var interiorTiles = TilesWithCountOfEdgesOnlyMatchingSelfEquals(0).ToList();
 
-				// start with one corner as the seed, then put all other corners and edge tiles into a bag
+				// start with one corner as the seed, then put all other tiles into a bag
 				var seed = cornerTiles[0];
-				var bag = cornerTiles.Skip(1).Concat(edgeTiles).ToList();
+				var bag = cornerTiles
+					.Skip(1)
+					.Select(x => (tile: x, kind: PlacedTileKind.Corner))
+					.Concat(edgeTiles.Select(x => (tile: x, kind: PlacedTileKind.Edge)))
+					.Concat(interiorTiles.Select(x => (tile: x, kind: PlacedTileKind.Interior)))
+					.ToDictionary(x => x.tile.ID);
 
 				// start the board by placing the seed, oriented as needed, into position (0,0)
-				Board board = new();
-				board.PlaceFirstCorner(seed);
+				Board board = new(this);
+				board.PlaceUpperLeftCorner(seed);
 
-				// grow the seed into a finished border by adding from the bag until the bag is empty
-				void PlaceAllFromBag()
+				// grow the seed by placing from bag against unmet edges until none remain
+				do
 				{
-					while (bag.Any())
-						foreach (var tile in bag)
-							if (board.TryPlace(tile))
-							{
-								bag.Remove(tile);
-								break;
-							}
-				}
-				PlaceAllFromBag();
+					// get one unmet edgeValue
+					var unmetEdge = board.UnmetEdges.First().Value;
 
-				// grow the border into the finished picture by refilling the bag with the interior pieces and repeating the above process
-				bag = interiorTiles.ToList();
-				PlaceAllFromBag();
+					// get one potential tile id it matches that are still in the bag
+					var tileID = edgeValues[unmetEdge.TrueEdgeValue]
+						.Select(x => x.Item1.TileID)
+						.Distinct()
+						.Where(x => bag.ContainsKey(x))
+						.Single();
+					var tile = tiles[tileID];
+
+					// place tile then remove from bag
+					board.Place(tile, bag[tileID].kind, unmetEdge);
+					bag.Remove(tileID);
+				}
+				while (board.UnmetEdges.Any());
+
+				throw new NotImplementedException("Still need to find nessy.");
 			}
 
-			public class PlacedTile
+			public record PlacedEdge
 			{
+				public Edge OriginalEdge {get; init;}
+				public PlacedTile PlacedTile {get; init;}
+				public bool Reversed {get; init;}
+				public EdgePlacement TruePlacement {get; init;}
+				public int TrueEdgeValue => Reversed ? OriginalEdge.Reversed : OriginalEdge.Natural;
+			}
+
+			public enum PlacedTileKind {None = 0, Corner, Edge, Interior};
+
+			public record PlacedTile
+			{
+				public Tile OriginalTile {get; init;}
+				public PlacedTileKind Kind {get; init;}
+
+				/// <summary>
+				/// True if the placement of the tile requires it to be flipped vertically before any rotation.
+				/// </summary>
+				public bool Flipped {get; init;}
+
+				/// <summary>
+				/// If non-zero, the placement of the tile requires it to be rotated clockwise this number of times after potential flipping.
+				/// </summary>
+				public int Rotations {get; init;}
+
+				public int Row {get; init;}
+				public int Column {get; init;}
+
+				public (int row, int column) Location => (Row, Column);
+
+				/// <summary>
+				/// Get's a dictionary of placed edges by their true placement.
+				/// </summary>
+				public IReadOnlyDictionary<EdgePlacement, PlacedEdge> PlacedEdges => placedEdges.Value;
+
+				public PlacedTile() => placedEdges = new(() => CalculatePlacedEdges.ToDictionary(x => x.TruePlacement));
+				private readonly Lazy<IReadOnlyDictionary<EdgePlacement, PlacedEdge>> placedEdges;
+				private PlacedEdge[] CalculatePlacedEdges {get{
+					var cur = (
+						right:  (edge: OriginalTile.Edges[EdgePlacement.Right],  reversed: false),
+						bottom: (edge: OriginalTile.Edges[EdgePlacement.Bottom], reversed: false),
+						left:   (edge: OriginalTile.Edges[EdgePlacement.Left],   reversed: false),
+						top:    (edge: OriginalTile.Edges[EdgePlacement.Top],    reversed: false)
+					);
+						if (Flipped)
+							cur = FlipVertically(cur);
+						foreach (var _ in Enumerable.Range(0, Rotations))
+							cur = RotateClockwise(cur);
+						return new[]{
+							(result: cur.right,  truePlacement: EdgePlacement.Right),
+							(result: cur.bottom, truePlacement: EdgePlacement.Bottom),
+							(result: cur.left,   truePlacement: EdgePlacement.Left),
+							(result: cur.top,    truePlacement: EdgePlacement.Top)
+						}
+						.Select(x => new PlacedEdge{
+							OriginalEdge = x.result.edge,
+							PlacedTile = this,
+							Reversed = x.result.reversed,
+							TruePlacement = x.truePlacement
+						})
+						.ToArray();
+				}}
+
+				public static ((T edge, bool reversed) right, (T edge, bool reversed) bottom, (T edge, bool reversed) left, (T edge, bool reversed) top) 
+					FlipVertically<T>(((T edge, bool reversed) right, (T edge, bool reversed) bottom, (T edge, bool reversed) left, (T edge, bool reversed) top) cur)
+				{
+					return (
+						right:  (cur.right.edge,  !cur.right.reversed),
+						bottom: (cur.top.edge,     cur.top.reversed),
+						left:   (cur.left.edge,   !cur.left.reversed),
+						top:    (cur.bottom.edge,  cur.bottom.reversed)
+					);
+				}
+
+				public static ((T edge, bool reversed) right, (T edge, bool reversed) bottom, (T edge, bool reversed) left, (T edge, bool reversed) top)
+					RotateClockwise<T>(((T edge, bool reversed) right, (T edge, bool reversed) bottom, (T edge, bool reversed) left, (T edge, bool reversed) top) cur)
+				{
+					return (
+						right:  (cur.top.edge,     cur.top.reversed),
+						bottom: (cur.right.edge,  !cur.right.reversed),
+						left:   (cur.bottom.edge,  cur.bottom.reversed),
+						top:    (cur.left.edge,   !cur.left.reversed)
+					);
+				}
 			}
 
 			public class Board
 			{
-				public void PlaceFirstCorner(Tile tile)
+				public TileAnalyzer TileAnalyzer {get;}
+				public Board(TileAnalyzer tileAnalyzer) => TileAnalyzer = tileAnalyzer;
+
+				private Dictionary<(int row, int column), PlacedTile> grid = new();
+
+				public int Width {get; private set;}
+				public int Height {get; private set;}
+
+				public IReadOnlyDictionary<int, PlacedEdge> UnmetEdges => unmetEdges;
+				private readonly Dictionary<int, PlacedEdge> unmetEdges = new();
+
+				public void PlaceUpperLeftCorner(Tile tile)
 				{
+					// determine which corners only match itself
+					List<Edge> cornerEdges = new();
+					foreach (var edge in tile.Edges.Values)
+						if (
+								1 == TileAnalyzer.edgeValues[edge.Natural].Count
+									&&
+								1 == TileAnalyzer.edgeValues[edge.Reversed].Count
+							)
+							cornerEdges.Add(edge);
+							
+					// get the placements in an ordered array
+					var orderedCornerPlacements = cornerEdges.Select(x => x.Placement).OrderBy(x => x).ToArray();
+
+					// this will yield one of the following lists of placements:
+					//   RB = needs 2 clockwise rotations         T
+					//   BL = needs 1                         ^  L R1 |
+					//   LT = needs 0                         |   B   v
+					//   RT = needs 3                            <--
+
+					// figure the number of clockwise rotations required
+					var clockwiseRotationsRequired =
+						((int)orderedCornerPlacements[1] - (int)orderedCornerPlacements[0] > 1) // the special RT case
+							? 3
+							: 3 - (int)orderedCornerPlacements[0];
+
+					// place the tile (we don't have to flip the first tile)
+					var seed = grid[(0,0)] = new PlacedTile{
+						OriginalTile = tile,
+						Kind = PlacedTileKind.Corner,
+						Flipped = false,
+						Rotations = clockwiseRotationsRequired,
+						Row = 0,
+						Column = 0
+					};
+
+					// we start at 1 by 1
+					Width = Height = 1;
+
+					// the unmet edge values are the placed tile's true right and bottom true edge values
+					foreach (var unmetEdge in new []{EdgePlacement.Right, EdgePlacement.Bottom}.Select(x => seed.PlacedEdges[x]))
+					{
+						if (unmetEdges.ContainsKey(unmetEdge.TrueEdgeValue))
+							throw new Exception("Unmet edge collision adding first corner.");
+						unmetEdges[unmetEdge.TrueEdgeValue] = unmetEdge;
+					}
 				}
 
-				public bool TryPlace(Tile tile)
+				public static IReadOnlyDictionary<
+						(EdgePlacement originalPlacement, EdgePlacement requiredPlacement, bool requiresReversal),
+						(bool flip, int clockwiseRotations)> 
+					OrientationMap => orientationMap.Value;
+				private static readonly Lazy<IReadOnlyDictionary<
+						(EdgePlacement originalPlacement, EdgePlacement requiredPlacement, bool requiresReversal),
+						(bool flip, int clockwiseRotations)>>
+					orientationMap = new(()=>CalculationOrientationMap());
+				private static IReadOnlyDictionary<
+						(EdgePlacement originalPlacement, EdgePlacement requiredPlacement, bool requiresReversal),
+						(bool flip, int clockwiseRotations)>
+					CalculationOrientationMap()
 				{
-					throw new NotImplementedException();
+					Dictionary<
+						(EdgePlacement originalPlacement, EdgePlacement requiredPlacement, bool requiresReversal),
+						(bool flip, int clockwiseRotations)
+					> map = new();
+
+					var cur = (
+						right:  (edge: EdgePlacement.Right,  reversed: false),
+						bottom: (edge: EdgePlacement.Bottom, reversed: false),
+						left:   (edge: EdgePlacement.Left,   reversed: false),
+						top:    (edge: EdgePlacement.Top,    reversed: false)
+					);
+					var flipped = PlacedTile.FlipVertically(cur);
+
+					foreach (var n in Enumerable.Range(0, 4))
+					{
+						map[(originalPlacement: cur.right.edge,  requiredPlacement: EdgePlacement.Right,  requiresReversal: cur.right.reversed)]  = (flip: false, clockwiseRotations: n);
+						map[(originalPlacement: cur.bottom.edge, requiredPlacement: EdgePlacement.Bottom, requiresReversal: cur.bottom.reversed)] = (flip: false, clockwiseRotations: n);
+						map[(originalPlacement: cur.left.edge,   requiredPlacement: EdgePlacement.Left,   requiresReversal: cur.left.reversed)]   = (flip: false, clockwiseRotations: n);
+						map[(originalPlacement: cur.top.edge,    requiredPlacement: EdgePlacement.Top,    requiresReversal: cur.top.reversed)]    = (flip: false, clockwiseRotations: n);
+
+						map[(originalPlacement: flipped.right.edge,  requiredPlacement: EdgePlacement.Right,  requiresReversal: flipped.right.reversed)]  = (flip: true, clockwiseRotations: n);
+						map[(originalPlacement: flipped.bottom.edge, requiredPlacement: EdgePlacement.Bottom, requiresReversal: flipped.bottom.reversed)] = (flip: true, clockwiseRotations: n);
+						map[(originalPlacement: flipped.left.edge,   requiredPlacement: EdgePlacement.Left,   requiresReversal: flipped.left.reversed)]   = (flip: true, clockwiseRotations: n);
+						map[(originalPlacement: flipped.top.edge,    requiredPlacement: EdgePlacement.Top,    requiresReversal: flipped.top.reversed)]    = (flip: true, clockwiseRotations: n);
+
+						cur = PlacedTile.RotateClockwise(cur);
+						flipped = PlacedTile.RotateClockwise(flipped);
+					}
+
+					return map;
+				}
+
+				public void Place(Tile tile, PlacedTileKind kind, PlacedEdge destEdge)
+				{
+					// first determine the coordinates of the new tile, based on:
+					//    1. the coordinates of the neighbor
+					//    2. the true placement of the destination edge
+					// along the way we can also conveniently determine the true placement for the new tile's attached edge
+
+					var neighbor = destEdge.PlacedTile;
+					var newLocation = neighbor.Location;
+					EdgePlacement newTileAttachedEdgeTruePlacement;
+					switch (destEdge.TruePlacement)
+					{
+						case EdgePlacement.Right:  newLocation.column++; newTileAttachedEdgeTruePlacement = EdgePlacement.Left;   break;
+						case EdgePlacement.Bottom: newLocation.row++;    newTileAttachedEdgeTruePlacement = EdgePlacement.Top;    break;
+						case EdgePlacement.Left:   newLocation.column--; newTileAttachedEdgeTruePlacement = EdgePlacement.Right;  break;
+						case EdgePlacement.Top:    newLocation.row--;    newTileAttachedEdgeTruePlacement = EdgePlacement.Bottom; break;
+						default: throw new Exception($"Unexpected placement: {destEdge.TruePlacement}");
+					}
+
+					// git the edge of the tile that matches the destination edge
+					var newTileAttachedEdgeInfo = tile
+						.Edges
+						.Values
+						.SelectMany(x => new[]{
+							(edgeValue: x.Natural, edge: x, reversed: false),
+							(edgeValue: x.Reversed, edge: x, reversed: true)
+						})
+						.Single(x => destEdge.TrueEdgeValue == x.edgeValue);
+
+					// look up what we have to do to orient the new tile's original edge to its required orientation
+					var (flip, clockwiseRotations) = OrientationMap[(
+							originalPlacement: newTileAttachedEdgeInfo.edge.Placement,
+							requiredPlacement: newTileAttachedEdgeTruePlacement,
+							requiresReversal: newTileAttachedEdgeInfo.reversed
+						)];;
+
+					// place the new tile
+					var newTile = grid[newLocation] = new PlacedTile{
+						OriginalTile = tile,
+						Kind = kind,
+						Flipped = flip,
+						Rotations = clockwiseRotations,
+						Row = newLocation.row,
+						Column = newLocation.column
+					};
+
+					// extend dimensions accordingly
+					if (newLocation.row >= Width)
+						Width++;
+					if (newLocation.column >= Height)
+						Height++;
+
+					// for each newly placed edge, either remove it from unmet, or add it to unmet if it's not exterior
+					foreach (var placedEdge in newTile.PlacedEdges.Values)
+					{
+						if (unmetEdges.ContainsKey(placedEdge.TrueEdgeValue))
+							unmetEdges.Remove(placedEdge.TrueEdgeValue);
+						else
+						{
+							bool isExterior = TileAnalyzer.edgeValues[placedEdge.TrueEdgeValue].All(x => x.edge.TileID == tile.ID);
+							if (!isExterior)
+								unmetEdges[placedEdge.TrueEdgeValue] = placedEdge;
+						}
+					}
 				}
 			}
 		}
