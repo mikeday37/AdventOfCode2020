@@ -85,8 +85,8 @@ Day 18:
 	Part 2 = 320536571743074
 
 Day 19:
-	Part 1 = 
-	Part 2 = 
+	Part 1 = 220
+	Part 2 = 439
 
 Day 20:
 	Part 1 = 
