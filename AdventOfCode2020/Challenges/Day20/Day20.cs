@@ -14,7 +14,7 @@ using System.Text.RegularExpressions;
 namespace AdventOfCode2020.Challenges.Day20
 {
 	[Challenge(20, "Jurassic Jigsaw")]
-	class Day20Challenge : ChallengeBase
+	public class Day20Challenge : ChallengeBase
 	{
 		public enum EdgePlacement { None = 0, Right = 1, Bottom = 2, Left = 3, Top = 4}; // these values and their order are crucial
 
@@ -538,7 +538,7 @@ namespace AdventOfCode2020.Challenges.Day20
 						Rotations = clockwiseRotationsRequired,
 						Row = 0,
 						Column = 0
-					}; ChallengeBase.ThreadLogger.LogLine($"{seed.Kind,8} tile {tile.ID} placed at {seed.Location,8} with {clockwiseRotationsRequired} clockwise rotation(s){(false ? ", after flipping vertically" : "")}.");
+					}; seed.LogPlacement();
 
 					// we start at 1 by 1
 					Width = Height = 1;
@@ -641,7 +641,7 @@ namespace AdventOfCode2020.Challenges.Day20
 						Rotations = clockwiseRotations,
 						Row = newLocation.row,
 						Column = newLocation.column
-					}; ChallengeBase.ThreadLogger.LogLine($"{kind,8} tile {tile.ID} placed at {newTile.Location,8} with {clockwiseRotations} clockwise rotation(s){(flip ? ", after flipping vertically" : "")}.");
+					}; newTile.LogPlacement();
 
 					// extend dimensions accordingly
 					if (newLocation.row >= Width)
@@ -663,6 +663,16 @@ namespace AdventOfCode2020.Challenges.Day20
 					}
 				}
 			}
+		}
+	}
+
+	public static class LocalExtensions
+	{
+		public static void LogPlacement(this Day20Challenge.TileAnalyzer.PlacedTile tile)
+		{
+			ChallengeBase.ThreadLogger.LogLine(
+				$"{tile.Kind,8} tile {tile.OriginalTile.ID} placed at {tile.Location,8} with {tile.Rotations} clockwise rotation(s){(tile.Flipped ? ", after flipping vertically" : "")}."
+			);
 		}
 	}
 }
