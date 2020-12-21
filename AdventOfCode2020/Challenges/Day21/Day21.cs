@@ -58,7 +58,7 @@ namespace AdventOfCode2020.Challenges.Day21
 			private readonly Dictionary<int, FoodLabel> labels = new();
 			private readonly HashSet<string> InertIngredients;
 
-			public int InertIngredientCount {get;}
+			public int InertIngredientUsageCount {get;}
 
 			public FoodAnalyzer(string input)
 			{
@@ -90,6 +90,7 @@ namespace AdventOfCode2020.Challenges.Day21
 						.ToList();
 
 					// get the intersection of those lists
+					// (based on: https://stackoverflow.com/a/1676684/4730748 )
 					var intersection = listOfLists
 						.Skip(1)
 						.Aggregate(
@@ -110,7 +111,7 @@ namespace AdventOfCode2020.Challenges.Day21
 					.ToHashSet();
 
 				// return total count of appearances of any inert ingredient in any food label
-				InertIngredientCount = labels
+				InertIngredientUsageCount = labels
 					.Values
 					.Select(label => label
 						.Ingredients
@@ -121,18 +122,14 @@ namespace AdventOfCode2020.Challenges.Day21
 
 			public string GetCanonicalDangerousIngredientList()
 			{
-				// first get dictionary of food label line # -> original ingredients except inert
+				// cull the input: get foreach food label: ingredients not inert, allergen list for that food
 				var cull = labels
 					.Values
 					.Select(x => (
-
-						labelNumber: x.LineNumber,
-
 						suspectIngredients: x
 							.Ingredients
 							.Where(y => !InertIngredients.Contains(y))
 							.ToHashSet(),
-
 						allergens: x
 							.Allergens
 							.ToHashSet()
@@ -151,7 +148,8 @@ namespace AdventOfCode2020.Challenges.Day21
 					foreach (var i in subAnalyzer.ingredients.Values)
 						ThreadLogger.LogLine($"{i.Name}: {string.Join(" | ", i.PotentialAllergens.OrderBy(x => x))}");
 
-				// solve
+				// repeat until can't: get a culled ingredient with only one potential alergen, and
+				//                     add to bad list, remove from culled (from both ingredients and allergens)
 				List<(string ingredient, string allergen)> bad = new();
 				for (; ;)
 				{
@@ -166,7 +164,7 @@ namespace AdventOfCode2020.Challenges.Day21
 						remaining.PotentialAllergens.Remove(allergen);
 				}
 				
-				// sort and return
+				// sort by allergen and return csv of ingredient
 				return string.Join(",", bad
 					.OrderBy(x => x.allergen)
 					.Select(x => x.ingredient)
@@ -176,7 +174,7 @@ namespace AdventOfCode2020.Challenges.Day21
 
 		public override object Part1(string input)
 		{
-			return new FoodAnalyzer(input).InertIngredientCount;
+			return new FoodAnalyzer(input).InertIngredientUsageCount;
 		}
 
 		public override object Part2(string input)
