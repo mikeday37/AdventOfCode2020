@@ -202,6 +202,69 @@ namespace AdventOfCode2020.Challenges.Day20
 
 			public void FindSeaMonsters()
 			{
+				// assumption: there's at least one nessy (the sea monster)
+
+				var picture = SolvePuzzle();
+
+				for (int attempt = 1; attempt <= 8; attempt++)
+				{
+					PictureUtility.LogLines($"Attempt {attempt}:", picture.Lines);
+
+					if (attempt == 5)
+						picture.FlipVertically();
+
+					if (picture.RemoveNessies())
+					{
+						waterRoughness = picture.CalculateWaterRoughness();
+						return;
+					}
+
+					picture.RotateClockwise();
+				}
+
+				throw new Exception("Could not find any sea monsters!");
+			}
+
+			public class Picture
+			{
+				public IReadOnlyList<string> Lines => lines;
+				private List<string> lines = new();
+
+				public Picture(Board board)
+				{
+					foreach (var row in Enumerable.Range(0, board.Height))
+					{
+						var sba = Enumerable.Range(0, 8).Select(x => new StringBuilder()).ToArray();
+						foreach (var col in Enumerable.Range(0, board.Width))
+							board.Grid[(row, col)].Render(sba);
+						foreach (var sb in sba)
+							lines.Add(sb.ToString());
+					}
+				}
+
+				public void FlipVertically()
+				{
+					lines.Reverse();
+				}
+
+				public void RotateClockwise()
+				{
+					lines = PictureUtility.RotateClockwise(lines);
+				}
+
+				public bool RemoveNessies()
+				{
+					throw new NotImplementedException();
+				}
+
+				public int CalculateWaterRoughness()
+				{
+					throw new NotImplementedException();
+				}
+			}
+
+			Picture SolvePuzzle()
+			{
 				// edge tiles are like corners but instead of 2, they have just one edge that only matches their tile.
 				var edgeTiles = TilesWithCountOfEdgesOnlyMatchingSelfEquals(1).ToList();
 
@@ -227,7 +290,7 @@ namespace AdventOfCode2020.Challenges.Day20
 					// get one unmet edgeValue
 					var unmetEdge = board.UnmetEdges.First().Value;
 
-					// get one potential tile id it matches that are still in the bag
+					// get (the) one potential tile id it matches that is still in the bag
 					var tileID = edgeValues[unmetEdge.TrueEdgeValue]
 						.Select(x => x.Item1.TileID)
 						.Distinct()
@@ -241,7 +304,8 @@ namespace AdventOfCode2020.Challenges.Day20
 				}
 				while (board.UnmetEdges.Any());
 
-				throw new NotImplementedException("Still need to find nessy.");
+				// now build the picture and return it
+				return new Picture(board);
 			}
 
 			public record PlacedEdge
@@ -329,6 +393,61 @@ namespace AdventOfCode2020.Challenges.Day20
 						top:    (cur.left.edge,   !cur.left.reversed)
 					);
 				}
+
+				internal void Render(StringBuilder[] sba)
+				{
+					var logger = ChallengeBase.ThreadLogger;
+					using (logger.Context($"Render {OriginalTile.ID}:"))
+					{
+						using (logger.Context("Tile Info:"))
+						{
+							logger.LogLine($"Location:  {Location}");
+							logger.LogLine($"Flipped:   {Flipped}");
+							logger.LogLine($"Rotations: {Rotations}");
+						}
+
+						PictureUtility.LogLines("RawOriginalData:", OriginalTile.RawOriginalData);
+
+						var lines = OriginalTile.RawOriginalData.Skip(1).SkipLast(1).Select(x => x[1..^1]).ToList();
+
+						if (Flipped)
+							lines.Reverse();
+						foreach (var _ in Enumerable.Range(0, Rotations))
+							lines = PictureUtility.RotateClockwise(lines);
+
+						PictureUtility.LogLines("Output:", lines);
+
+						foreach (var (item, index) in lines.WithIndex())
+							sba[index].Append(item);
+					}
+				}
+			}
+
+			public static class PictureUtility
+			{
+				public static void LogLines(string context, IEnumerable<string> lines)
+				{
+					var logger = ChallengeBase.ThreadLogger;
+					using (logger.Context(context))
+						foreach (var line in lines)
+							logger.LogLine(line);
+				}
+
+				public static List<string> RotateClockwise(List<string> lines)
+				{
+					// assumption: all lines are the same length, no null, at least one.
+
+					var len = lines.Count;
+					if (!lines.All(x => x.Length == len))
+						throw new Exception("Invalid lines for rotation.");
+
+					var sba = Enumerable.Range(0, len).Select(x => new StringBuilder()).ToArray();
+					for (int oc = 0; oc < len; oc++)
+						for (int or = len - 1; or >= 0; or--)
+							sba[oc].Append(lines[or][oc]);
+
+					return sba.Select(x => x.ToString()).ToList();
+				}
 			}
 
 			public class Board
@@ -336,7 +455,8 @@ namespace AdventOfCode2020.Challenges.Day20
 				public TileAnalyzer TileAnalyzer {get;}
 				public Board(TileAnalyzer tileAnalyzer) => TileAnalyzer = tileAnalyzer;
 
-				private Dictionary<(int row, int column), PlacedTile> grid = new();
+				public IReadOnlyDictionary<(int row, int column), PlacedTile> Grid => grid;
+				private readonly Dictionary<(int row, int column), PlacedTile> grid = new();
 
 				public int Width {get; private set;}
 				public int Height {get; private set;}

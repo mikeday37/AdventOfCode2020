@@ -22,9 +22,9 @@ namespace AdventOfCode2020.Challenges
 			}
 		}
 
-		public static IEnumerable<(T, int)> WithIndex<T>(this IEnumerable<T> e)
+		public static IEnumerable<(T item, int index)> WithIndex<T>(this IEnumerable<T> e)
 		{
-			return e.Select((x,i) => (x,i));
+			return e.Select((x,i) => (item: x, index: i));
 		}
 	}
 }
