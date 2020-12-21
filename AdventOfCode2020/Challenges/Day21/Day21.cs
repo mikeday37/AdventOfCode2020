@@ -16,11 +16,11 @@ namespace AdventOfCode2020.Challenges.Day21
 	[Challenge(21, "Allergen Assessment")]
 	public class Day21Challenge : ChallengeBase
 	{
-		public record FoodLabel
+		public class FoodLabel
 		{
 			public int LineNumber { get; }
-			public IReadOnlySet<string> Ingredients { get; }
-			public IReadOnlySet<string> Allergens { get; }
+			public HashSet<string> Ingredients { get; }
+			public HashSet<string> Allergens { get; }
 
 			public FoodLabel(string line, int index)
 			{
@@ -51,73 +51,137 @@ namespace AdventOfCode2020.Challenges.Day21
 			public Allergen() => Labels = new();
 		}
 
+		public class FoodAnalyzer
+		{
+			private readonly Dictionary<string, Ingredient> ingredients = new();
+			private readonly Dictionary<string, Allergen> allergens = new();
+			private readonly Dictionary<int, FoodLabel> labels = new();
+			private readonly HashSet<string> InertIngredients;
+
+			public int InertIngredientCount {get;}
+
+			public FoodAnalyzer(string input)
+			{
+				// for each food label, build a dictionary for each ingredient and allergen -> list of labels it appears in
+				foreach (var label in FoodLabel.ParseAll(input))
+				{
+					labels[label.LineNumber] = label;
+					foreach (var ingredient in label.Ingredients)
+					{
+						if (!ingredients.ContainsKey(ingredient))
+							ingredients[ingredient] = new Ingredient { Name = ingredient };
+						ingredients[ingredient].Labels.Add(label);
+					}
+					foreach (var allergen in label.Allergens)
+					{
+						if (!allergens.ContainsKey(allergen))
+							allergens[allergen] = new Allergen { Name = allergen };
+						allergens[allergen].Labels.Add(label);
+					}
+				}
+
+				// for each allergen
+				foreach (var allergen in allergens.Values)
+				{
+					// get a list of all ingredient lists for foods known to have this allergen
+					var listOfLists = allergen
+						.Labels
+						.Select(x => x.Ingredients.ToList())
+						.ToList();
+
+					// get the intersection of those lists
+					var intersection = listOfLists
+						.Skip(1)
+						.Aggregate(
+							new HashSet<string>(listOfLists[0]),
+							(a, b) => { a.IntersectWith(b); return a; }
+						);
+
+					// mark all in the intersection as potentially the allergen
+					foreach (var ingredient in intersection)
+						ingredients[ingredient].PotentialAllergens.Add(allergen.Name);
+				}
+
+				// determine ingredients which can't contain any of the known allergens
+				InertIngredients = ingredients
+					.Values
+					.Where(x => 0 == x.PotentialAllergens.Count)
+					.Select(x => x.Name)
+					.ToHashSet();
+
+				// return total count of appearances of any inert ingredient in any food label
+				InertIngredientCount = labels
+					.Values
+					.Select(label => label
+						.Ingredients
+						.Count(i => InertIngredients.Contains(i))
+					)
+					.Sum();
+			}
+
+			public string GetCanonicalDangerousIngredientList()
+			{
+				// first get dictionary of food label line # -> original ingredients except inert
+				var cull = labels
+					.Values
+					.Select(x => (
+
+						labelNumber: x.LineNumber,
+
+						suspectIngredients: x
+							.Ingredients
+							.Where(y => !InertIngredients.Contains(y))
+							.ToHashSet(),
+
+						allergens: x
+							.Allergens
+							.ToHashSet()
+					));
+
+				// rebuild the culled input
+				var culledInput = string.Join('\n', cull
+					.Select(x => $"{string.Join(" ", x.suspectIngredients)} (contains {string.Join(", ", x.allergens)})")
+				);
+				using (ThreadLogger.Context("culledInput:"))
+						ThreadLogger.LogLine(culledInput);
+
+				// re-analyze it
+				var subAnalyzer = new FoodAnalyzer(culledInput);
+				using (ThreadLogger.Context("suspects:"))
+					foreach (var i in subAnalyzer.ingredients.Values)
+						ThreadLogger.LogLine($"{i.Name}: {string.Join(" | ", i.PotentialAllergens.OrderBy(x => x))}");
+
+				// solve
+				List<(string ingredient, string allergen)> bad = new();
+				for (; ;)
+				{
+					var pick = ingredients.Values.FirstOrDefault(x => x.PotentialAllergens.Count == 1);
+					if (pick == null)
+						break;
+					var ingredient = pick.Name;
+					var allergen = pick.PotentialAllergens.Single();
+					bad.Add((ingredient, allergen));
+					ingredients.Remove(ingredient);
+					foreach (var remaining in ingredients.Values)
+						remaining.PotentialAllergens.Remove(allergen);
+				}
+				
+				// sort and return
+				return string.Join(",", bad
+					.OrderBy(x => x.allergen)
+					.Select(x => x.ingredient)
+				);
+			}
+		}
+
 		public override object Part1(string input)
 		{
-			Dictionary<string, Ingredient> ingredients = new();
-			Dictionary<string, Allergen> allergens = new();
-			Dictionary<int, FoodLabel> labels = new();
-
-			// for each food label, build a dictionary for each ingredient and allergen -> list of labels it appears in
-			foreach (var label in FoodLabel.ParseAll(input))
-			{
-				labels[label.LineNumber] = label;
-				foreach (var ingredient in label.Ingredients)
-				{
-					if (!ingredients.ContainsKey(ingredient))
-						ingredients[ingredient] = new Ingredient{Name = ingredient};
-					ingredients[ingredient].Labels.Add(label);
-				}
-				foreach (var allergen in label.Allergens)
-				{
-					if (!allergens.ContainsKey(allergen))
-						allergens[allergen] = new Allergen{Name = allergen};
-					allergens[allergen].Labels.Add(label);
-				}
-			}
-
-			// for each allergen
-			foreach (var allergen in allergens.Values)
-			{
-				// get a list of all ingredient lists for foods known to have this allergen
-				var listOfLists = allergen
-					.Labels
-					.Select(x => x.Ingredients.ToList())
-					.ToList();
-
-				// get the intersection of those lists
-				var intersection = listOfLists
-					.Skip(1)
-					.Aggregate(
-						new HashSet<string>(listOfLists[0]),
-						(a, b) => { a.IntersectWith(b); return a; }
-					);
-
-				// mark all in the intersection as potentially the allergen
-				foreach (var ingredient in intersection)
-					ingredients[ingredient].PotentialAllergens.Add(allergen.Name);
-			}
-
-			// determine ingredients which can't contain any of the known allergens
-			var safeIngredients = ingredients
-				.Values
-				.Where(x => 0 == x.PotentialAllergens.Count)
-				.Select(x => x.Name)
-				.ToHashSet();
-
-			// return total count of appearances of any safe ingredient in any food label
-			return labels
-				.Values
-				.Select(label => label
-					.Ingredients
-					.Count(i => safeIngredients.Contains(i))
-				)
-				.Sum();
+			return new FoodAnalyzer(input).InertIngredientCount;
 		}
 
 		public override object Part2(string input)
 		{
-			return -1;
+			return new FoodAnalyzer(input).GetCanonicalDangerousIngredientList();
 		}
-
 	}
 }
