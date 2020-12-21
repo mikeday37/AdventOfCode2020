@@ -188,6 +188,12 @@ namespace AdventOfCode2020.Challenges.Day20
 				.Aggregate(1UL, (a, b) => a * b);
 		}
 
+		private static readonly IReadOnlyList<string> seaMonster = new[]{
+				"..................#.",
+				"#....##....##....###", // its name is Nessy.  :)
+				".#..#..#..#..#..#..."
+			};
+
 		public override object Part2(string input)
 		{
 			var ta = new TileAnalyzer(input);
@@ -205,21 +211,27 @@ namespace AdventOfCode2020.Challenges.Day20
 				// assumption: there's at least one nessy (the sea monster)
 
 				var picture = SolvePuzzle();
+				var nessy = seaMonster.ToList();
 
+				PictureUtility.LogLines("Assembled Photo:", picture.Lines);
+
+				using (ChallengeBase.ThreadLogger.Context("Searching for Sea Monsters..."))
 				for (int attempt = 1; attempt <= 8; attempt++)
 				{
-					PictureUtility.LogLines($"Attempt {attempt}:", picture.Lines);
-
+					// flip vertically after the first set of rotations.
 					if (attempt == 5)
-						picture.FlipVertically();
+						nessy.Reverse();
 
-					if (picture.RemoveNessies())
+					PictureUtility.LogLines($"Attempt {attempt}:", nessy);
+
+					if (picture.RemoveNessies(nessy))
 					{
+						PictureUtility.LogLines("Found!\nRemoved from Photo:", picture.Lines);
 						waterRoughness = picture.CalculateWaterRoughness();
 						return;
 					}
 
-					picture.RotateClockwise();
+					nessy = PictureUtility.RotateClockwise(nessy);
 				}
 
 				throw new Exception("Could not find any sea monsters!");
@@ -242,24 +254,51 @@ namespace AdventOfCode2020.Challenges.Day20
 					}
 				}
 
-				public void FlipVertically()
+				/// <summary>
+				/// Simultenously removes all discovered nessies from the picture, then returns true if any were removed.
+				/// </summary>
+				/// <param name="nessy">The nessy to search for and remove.</param>
+				/// <returns>True if any nessies were removed, false if not.</returns>
+				public bool RemoveNessies(IReadOnlyList<string> nessy)
 				{
-					lines.Reverse();
-				}
+					var (nw, nh, w, h) = ( // nessy dimensions, picture dimensions
+						nessy[0].Length, nessy.Count,
+						lines[0].Length, lines.Count);
 
-				public void RotateClockwise()
-				{
-					lines = PictureUtility.RotateClockwise(lines);
-				}
+					IEnumerable<(int r, int c)> NessyPartOffsets()
+					{
+						foreach (var nr in nessy.WithIndex())
+							foreach (var nc in nr.item.WithIndex().Where(x => x.item == '#'))
+								yield return (r: nr.index, c: nc.index);
+					}
+					var npo = NessyPartOffsets().ToList();
 
-				public bool RemoveNessies()
-				{
-					throw new NotImplementedException();
+					int count = 0;
+					HashSet<(int r, int c)> remove = new();
+					for (int r = 0; r < h - nh; r++)
+						for (int c = 0; c < w - nw; c++)
+						{
+							if (npo.All(po => lines[r + po.r][c + po.c] == '#'))
+							{
+								count++;
+								foreach (var po in npo)
+									remove.Add((r: r + po.r, c: c + po.c));
+							}
+						}
+
+					foreach (var x in remove)
+					{
+						var ca = lines[x.r].ToCharArray();
+						ca[x.c] = 'O';
+						lines[x.r] = new string(ca);
+					}
+					
+					return count > 0;
 				}
 
 				public int CalculateWaterRoughness()
 				{
-					throw new NotImplementedException();
+					return lines.Select(x => x.Count(y => y == '#')).Sum();
 				}
 			}
 
@@ -437,13 +476,13 @@ namespace AdventOfCode2020.Challenges.Day20
 				{
 					// assumption: all lines are the same length, no null, at least one.
 
-					var len = lines.Count;
-					if (!lines.All(x => x.Length == len))
+					var (ow, oh) = (lines[0].Length, lines.Count);
+					if (!lines.Skip(1).All(x => x.Length == ow))
 						throw new Exception("Invalid lines for rotation.");
 
-					var sba = Enumerable.Range(0, len).Select(x => new StringBuilder()).ToArray();
-					for (int oc = 0; oc < len; oc++)
-						for (int or = len - 1; or >= 0; or--)
+					var sba = Enumerable.Range(0, ow).Select(x => new StringBuilder()).ToArray();
+					for (int oc = 0; oc < ow; oc++)
+						for (int or = oh - 1; or >= 0; or--)
 							sba[oc].Append(lines[or][oc]);
 
 					return sba.Select(x => x.ToString()).ToList();
