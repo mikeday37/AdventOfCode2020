@@ -538,7 +538,7 @@ namespace AdventOfCode2020.Challenges.Day20
 						Rotations = clockwiseRotationsRequired,
 						Row = 0,
 						Column = 0
-					};
+					}; ChallengeBase.ThreadLogger.LogLine($"{seed.Kind,8} tile {tile.ID} placed at {seed.Location,8} with {clockwiseRotationsRequired} clockwise rotation(s){(false ? ", after flipping vertically" : "")}.");
 
 					// we start at 1 by 1
 					Width = Height = 1;
@@ -641,7 +641,7 @@ namespace AdventOfCode2020.Challenges.Day20
 						Rotations = clockwiseRotations,
 						Row = newLocation.row,
 						Column = newLocation.column
-					};
+					}; ChallengeBase.ThreadLogger.LogLine($"{kind,8} tile {tile.ID} placed at {newTile.Location,8} with {clockwiseRotations} clockwise rotation(s){(flip ? ", after flipping vertically" : "")}.");
 
 					// extend dimensions accordingly
 					if (newLocation.row >= Width)
