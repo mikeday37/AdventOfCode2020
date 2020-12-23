@@ -30,18 +30,18 @@ namespace AdventOfCode2020.Challenges.Day22
 				else
 					deck[player].Enqueue(int.Parse(line));
 
-			return PlayCombat(0, ref game, deck, recurse).score;
+			return PlayCombat(ref game, deck, recurse).score;
 		}
 
 		public override object Part2(string input)
 		{
-			return Part1("R\n" + input);
+			return Part1("R\n" + input); // :cheeky-grin:
 		}
 
-		public (int winner, int score) PlayCombat(int parentGame, ref int nextGame, Dictionary<int, Queue<int>> deck, bool recursive)
+		public (int winner, int score) PlayCombat(ref int nextGame, Dictionary<int, Queue<int>> deck, bool recursive)
 		{
 			var game = nextGame++;
-			Logger.LogLine($"=== Game {game} ===\n");
+			Logger.LogLine($"=== Game {game} ===");
 
 			HashSet<string> history = new();
 			void logAllDecks()
@@ -67,27 +67,50 @@ namespace AdventOfCode2020.Challenges.Day22
 						throw new Exception("Infinite loop detected!");
 				}
 
-				Logger.LogLine($"-- Round {++round} --");
+				Logger.LogLine($"\n-- Round {++round} {(recursive ? $"(Game {game})" : "")}--");
 				logAllDecks();
 					
 				var picks = deck
 					.Where(x => x.Value.Any())
 					.Select(x => (player: x.Key, card: x.Value.Dequeue()))
-					.OrderByDescending(x => x.card)
+					.OrderBy(x => x.player)
 					.ToList();
-				foreach (var pick in picks.OrderBy(x => x.player))
+				foreach (var pick in picks)
 					Logger.LogLine($"Player {pick.player} plays: {pick.card}");
 
-				winner = picks.First().player;
+				if (recursive && picks.All(x => x.card <= deck[x.player].Count))
+				{
+					Logger.LogLine("Playing a sub-game to determine the winner...\n");
+					var subDeck = deck
+						.ToDictionary(
+							x => x.Key,
+							x => x.Value
+								.Take(picks
+									.Where(p => p.player == x.Key)
+									.Select(p => p.card)
+									.SingleOrDefault()
+								)
+								.ToQueue()
+						);
+					winner = PlayCombat(ref nextGame, subDeck, true).winner;
+					Logger.LogLine($"...anyway, back to game {game}.");
+				}
+				else
+					winner = picks.OrderByDescending(x => x.card).First().player;
+
 				Logger.LogLine(recursive
-					? $"Player {winner} wins round {round} of game {game}!\n"
-					: $"Player {winner} wins the round!\n"
+					? $"Player {winner} wins round {round} of game {game}!"
+					: $"Player {winner} wins the round!"
 				);
 
-				foreach (var pick in picks)
+				foreach (var pick in picks.OrderBy(x => x.player == winner ? 1 : 2))
 					deck[winner].Enqueue(pick.card);
 			}
 			while (deck.Values.Count(x => x.Any()) != 1);
+
+			if (recursive)
+				Logger.LogLine($"The winner of game {game} is player {winner}!");
+			Logger.LogLine();
 
 			if (game == 1)
 			{

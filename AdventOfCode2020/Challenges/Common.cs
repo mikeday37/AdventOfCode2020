@@ -26,5 +26,13 @@ namespace AdventOfCode2020.Challenges
 		{
 			return e.Select((x,i) => (item: x, index: i));
 		}
+
+		public static Queue<T> ToQueue<T>(this IEnumerable<T> e)
+		{
+			Queue<T> q = new();
+			foreach (var i in e)
+				q.Enqueue(i);
+			return q;
+		}
 	}
 }
