@@ -26,8 +26,12 @@ namespace AdventOfCode2020.Challenges.Day22
 				else
 					deck[player].Enqueue(int.Parse(line));
 
-			HashSet<string> history = new();
+			return PlayCombat(deck).score;
+		}
 
+		public (int winner, int score) PlayCombat(Dictionary<int, Queue<int>> deck, bool recursive = false)
+		{
+			HashSet<string> history = new();
 			void logAllDecks()
 			{
 				foreach (var p in deck.Keys)
@@ -64,10 +68,13 @@ namespace AdventOfCode2020.Challenges.Day22
 			Logger.LogLine("\n== Post-game results ==");
 			logAllDecks();
 
-			return deck[winner]
-				.Reverse()
-				.WithIndex()
-				.Sum(x => x.item * (1 + x.index));
+			return (
+				winner: winner, 
+				score: deck[winner]
+					.Reverse()
+					.WithIndex()
+					.Sum(x => x.item * (1 + x.index))
+			);
 		}
 
 		public override object Part2(string input)
