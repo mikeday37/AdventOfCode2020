@@ -16,29 +16,39 @@ namespace AdventOfCode2020.Challenges.Day22
 	[Challenge(22, "Crab Combat")]
 	public class Day22Challenge : ChallengeBase
 	{
-		public override object Part1(string input)
+		private static Dictionary<int, Queue<int>> ParseInput(string input)
 		{
-			int game = 1;
-			bool recurse = false;
-			Dictionary<int, Queue<int>> deck = new();
+			Dictionary<int, Queue<int>> decks = new();
 			int player = 0;
 			foreach (var line in input.ToLines())
 				if (line[0] == 'P')
-					deck[player = int.Parse(line[^2..^1])] = new();
-				else if (line == "R")
-					recurse = true;
+					decks[player = int.Parse(line[^2..^1])] = new();
 				else
-					deck[player].Enqueue(int.Parse(line));
+					decks[player].Enqueue(int.Parse(line));
+			return decks;
+		}
 
-			return PlayCombat(ref game, deck, recurse).score;
+		public override object Part1(string input)
+		{
+			return PlayCombat(ParseInput(input)).score;
 		}
 
 		public override object Part2(string input)
 		{
-			return Part1("R\n" + input); // :cheeky-grin:
+			return PlayCombat(ParseInput(input), recursive: true).score;
 		}
 
-		public (int winner, int score) PlayCombat(ref int nextGame, Dictionary<int, Queue<int>> deck, bool recursive)
+		private (int winner, int score) PlayCombat(Dictionary<int, Queue<int>> deck, bool recursive = false)
+		{
+			int game = 1;
+			return PlayCombat(ref game, deck, recursive);
+		}
+
+		/// <summary>
+		/// Plays the generalized version of Day 22's "Combat" and "Recursive Combat" games...
+		/// generalized in that there can be any number of players, not just two.  :)
+		/// </summary>
+		private (int winner, int score) PlayCombat(ref int nextGame, Dictionary<int, Queue<int>> deck, bool recursive)
 		{
 			var game = nextGame++;
 			Logger.LogLine($"=== Game {game} ===");
@@ -78,7 +88,7 @@ namespace AdventOfCode2020.Challenges.Day22
 				foreach (var pick in picks)
 					Logger.LogLine($"Player {pick.player} plays: {pick.card}");
 
-				if (recursive && picks.All(x => x.card <= deck[x.player].Count))
+				if (recursive && picks.Count > 1 && picks.All(x => x.card <= deck[x.player].Count))
 				{
 					Logger.LogLine("Playing a sub-game to determine the winner...\n");
 					var subDeck = deck

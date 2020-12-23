@@ -97,8 +97,8 @@ Day 21:
 	Part 2 = bjq,jznhvh,klplr,dtvhzt,sbzd,tlgjzx,ctmbr,kqms
 
 Day 22:
-	Part 1 = 
-	Part 2 = 
+	Part 1 = 30780
+	Part 2 = 36621
 
 Day 23:
 	Part 1 = 
