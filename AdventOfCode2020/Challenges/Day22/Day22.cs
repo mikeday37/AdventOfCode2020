@@ -18,16 +18,15 @@ namespace AdventOfCode2020.Challenges.Day22
 	{
 		public override object Part1(string input)
 		{
-			bool recurse = false;
 			Dictionary<int, Queue<int>> deck = new();
 			int player = 0;
 			foreach (var line in input.ToLines())
 				if (line[0] == 'P')
 					deck[player = int.Parse(line[^2..^1])] = new();
-				else if (line == "R")
-					recurse = true;
 				else
 					deck[player].Enqueue(int.Parse(line));
+
+			HashSet<string> history = new();
 
 			void logAllDecks()
 			{
@@ -39,6 +38,9 @@ namespace AdventOfCode2020.Challenges.Day22
 			do
 			{
 				base.AllowCancel();
+				var state = string.Join("; ", deck.OrderBy(x => x.Key).Select(x => $"{x.Key}: {string.Join(", ", x.Value)}"));
+				if (!history.Add(state))
+					throw new Exception("Infinite loop detected!");
 
 				Logger.LogLine($"-- Round {++round} --");
 				logAllDecks();
@@ -70,7 +72,7 @@ namespace AdventOfCode2020.Challenges.Day22
 
 		public override object Part2(string input)
 		{
-			return Part1("R\n" + input);
+			return -1;
 		}
 	}
 }
