@@ -101,7 +101,7 @@ Day 22:
 	Part 2 = 36621
 
 Day 23:
-	Part 1 = 
+	Part 1 = 82635947
 	Part 2 = 
 
 Day 24:
