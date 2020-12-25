@@ -109,6 +109,5 @@ Day 24:
 	Part 2 = 3466
 
 Day 25:
-	Part 1 = 
-	Part 2 = 
+	Part 1 = 12181021
 	
