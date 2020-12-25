@@ -106,7 +106,7 @@ Day 23:
 
 Day 24:
 	Part 1 = 300
-	Part 2 = 
+	Part 2 = 3466
 
 Day 25:
 	Part 1 = 

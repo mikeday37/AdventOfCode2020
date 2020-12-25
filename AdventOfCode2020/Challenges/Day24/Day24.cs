@@ -53,7 +53,7 @@ namespace AdventOfCode2020.Challenges.Day24
 				}
 		}
 
-		public override object Part1(string input)
+		public static HashSet<(int u, int v)> GetInitiallyBlackTiles(string input)
 		{
 			HashSet<(int u, int v)> blackTiles = new();
 			void Flip((int u, int v) pos)
@@ -75,13 +75,40 @@ namespace AdventOfCode2020.Challenges.Day24
 				}
 				Flip((u, v));
 			}
+			return blackTiles;
+		}
 
+		public override object Part1(string input)
+		{
+			var blackTiles = GetInitiallyBlackTiles(input);
 			return blackTiles.Count;
 		}
 
 		public override object Part2(string input)
 		{
-			return -1;
+			var blackTiles = GetInitiallyBlackTiles(input);
+			foreach (var _ in Enumerable.Range(1, 100))
+				Iterate(blackTiles);
+			return blackTiles.Count;
+		}
+
+		private static void Iterate(HashSet<(int u, int v)> blackTiles)
+		{
+			Dictionary<(int u, int v), int> blackness = new();
+			void AddBlackness((int u, int v) pos) =>
+				blackness[pos] = 1 + (blackness.TryGetValue(pos, out var b) ? b : 0);
+
+			foreach (var (u, v) in blackTiles)
+				foreach (var (du, dv) in OffsetMap.Values.Concat(new []{(0,0)}))
+					AddBlackness((u + du, v + dv));
+
+			foreach (var b in blackness)
+			{
+				if (blackTiles.Contains(b.Key) && (b.Value == 1 || b.Value > 3)) // add one for black center
+					blackTiles.Remove(b.Key);
+				else if (!blackTiles.Contains(b.Key) && b.Value == 2)
+					blackTiles.Add(b.Key);
+			}
 		}
 	}
 }
