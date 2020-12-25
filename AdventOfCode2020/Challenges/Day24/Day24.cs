@@ -11,10 +11,10 @@ using System.Threading.Tasks;
 using System.Runtime.CompilerServices;
 using System.Text.RegularExpressions;
 
-namespace AdventOfCode2020.Challenges.Day00
+namespace AdventOfCode2020.Challenges.Day24
 {
-	[Challenge(00, "_______")]
-	public class Day00Challenge : ChallengeBase
+	[Challenge(24, "Lobby Layout")]
+	public class Day24Challenge : ChallengeBase
 	{
 		public override object Part1(string input)
 		{
