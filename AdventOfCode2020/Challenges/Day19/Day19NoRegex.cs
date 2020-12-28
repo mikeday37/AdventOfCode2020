@@ -124,9 +124,59 @@ namespace AdventOfCode2020.Challenges.Day19
 			public MessageTester(IReadOnlyDictionary<int, Rule> rules)
 			{
 				rootLink = new(){Rule = rules[0]};
-				leafLinks.Add(rootLink);
+				unresolvedInitialLeafLinks.Add(rootLink);
 
-				void LogTree(Link link)
+				using (ThreadLogger.Context("Growing Initial Tree..."))
+					while (unresolvedInitialLeafLinks.Any())
+						foreach (var link in unresolvedInitialLeafLinks.ToList())
+							GrowInitialTree(link, rules);
+
+				using (ThreadLogger.Context("Finding Cycles..."))
+				{
+					HashSet<Link> stack = new(), potential = new(), cyclic = new();
+					int directCycles = 0;
+
+					void DFS(Link link)
+					{
+						if (stack.Contains(link))
+						{
+							link.Cyclic = true;
+							link.DirectlyCyclic = true;
+							directCycles++;
+							ThreadLogger.LogLine($"Directly Cyclic link found for Rule {link.ClosestContainingRule.Index}.");
+							foreach (var s in potential.ToList())
+							{
+								cyclic.Add(s);
+								potential.Remove(s);
+							}
+						}
+						else if (link.Child != null)
+						{
+							stack.Add(link);
+							potential.Add(link);
+
+							foreach (var childLink in link.Child.ChildLinks)
+								DFS(childLink);
+
+							potential.Remove(link);
+							stack.Remove(link);
+						}
+					}
+
+					using (ThreadLogger.Context("Finding Direct Cycles..."))
+						DFS(rootLink);
+
+					using (ThreadLogger.Context("Marking Indirect Cycles..."))
+						foreach (var l in cyclic)
+						{
+							l.Cyclic = true;
+							ThreadLogger.LogLine($"Indirectly Cyclic link found for Rule {l.ClosestContainingRule.Index}.");
+						}
+
+					ThreadLogger.LogLine($"Cycle Count: Direct = {directCycles}, Indirect = {cyclic.Count - directCycles}, Total = {cyclic.Count}");
+				}
+
+				static void LogTree(Link link)
 				{
 					using (ThreadLogger.Context(link.ToString()))
 						if (link.Child == null)
@@ -137,36 +187,23 @@ namespace AdventOfCode2020.Challenges.Day19
 									LogTree(childLink);
 				}
 
-				int iteration = 0;
-				using (ThreadLogger.Context("Growing Initial Tree..."))
-				{
-					while (leafLinks.Any())
-					{
-						++iteration;
-						using (ThreadLogger.Context($"Iteration #{iteration}:"))
-						{
-							LogTree(rootLink);
-							foreach (var link in leafLinks.ToList())
-								GrowInitialTree(link, rules);
-						}
-					}
-					using (ThreadLogger.Context("Final:"))
-						LogTree(rootLink);
-				}
+				using (ThreadLogger.Context("Tree Results:"))
+					LogTree(rootLink);
 			}
 
 			private readonly Link rootLink;
 			private readonly Dictionary<int, Node> ruleNodes = new();
-			private readonly HashSet<Link> leafLinks = new();
+			private readonly HashSet<Link> unresolvedInitialLeafLinks = new();
 
 			private void GrowInitialTree(Link AL, IReadOnlyDictionary<int, Rule> rules)
 			{
-				leafLinks.Remove(AL);
+				unresolvedInitialLeafLinks.Remove(AL);
 				bool preExisting = ruleNodes.TryGetValue(AL.Rule.Index, out var A);
 				if (preExisting)
 				{
 					AL.PreExisting = true;
 					AL.Child = A;
+					// note: could mark A's "additional parent links" at this point if desired
 				}
 				else
 				{
@@ -182,7 +219,7 @@ namespace AdventOfCode2020.Challenges.Day19
 							{
 								var BL = new Link{Parent = A, Rule = rules[b]};
 								A.ChildLinks.Add(BL);
-								leafLinks.Add(BL);
+								unresolvedInitialLeafLinks.Add(BL);
 							}
 							break;
 							
@@ -198,7 +235,7 @@ namespace AdventOfCode2020.Challenges.Day19
 								{
 									var CL = new Link{Parent = B, Rule = rules[c]};
 									B.ChildLinks.Add(CL);
-									leafLinks.Add(CL);
+									unresolvedInitialLeafLinks.Add(CL);
 								}
 							}
 							break;
@@ -209,20 +246,42 @@ namespace AdventOfCode2020.Challenges.Day19
 				}
 			}
 
-
 			private class Link
 			{
 				public Node Parent {get; set;}
 				public Node Child {get; set;}
 				public Rule Rule {get; set;}
 				public bool PreExisting {get; set;}
+				public bool Cyclic {get;set;}
+				public bool DirectlyCyclic {get;set;}
+				public Rule ClosestContainingRule {get{
+					var l = this;
+					while (l.Rule == null)
+					{
+						l = l.Parent?.ParentLink;
+						if (l == null) throw new NullReferenceException("Null reference while attempting to find ClosestContainingRule.");
+					}
+					return l.Rule;
+				}}
 
 				public override string ToString()
 				{
+					var sb = new StringBuilder();
+
 					if (Rule == null)
-						return "(no rule)";
+						sb.Append("(no rule)");
 					else
-						return $"Rule {Rule.Index,2}{(PreExisting ? " - PreExisting" : "")}";
+						sb.Append($"Rule {Rule.Index,3}");
+
+					if (PreExisting)
+						sb.Append(" - Pre-Existing");
+
+					if (DirectlyCyclic)
+						sb.Append(" - Directly Cyclic");
+					else if (Cyclic)
+						sb.Append(" - Cyclic");
+
+					return sb.ToString();
 				}
 			}
 
