@@ -116,36 +116,6 @@ namespace AdventOfCode2020.Challenges.Day19
 
 		public class MessageTester
 		{
-			private class MatchStackEntry
-			{
-				public int EntryCursor {get;set;}
-				public Node Node {get;set;}
-				public int State {get;set;}
-			}
-
-			public bool IsValid(string message)
-			{
-				/*int cursor = 0;
-				Stack<MatchStackEntry> stack = new();
-
-				MatchStackEntry Push(Node node)
-				{
-					var entry = new MatchStackEntry{EntryCursor = cursor, Node = node};
-					stack.Push(entry);
-					return entry;
-				}
-
-				var top = Push(rootLink.Child);
-				var bottom = top;
-
-				for (; ;)
-				{
-					
-				}*/
-
-				return false; // todo
-			}
-
 			public MessageTester(IReadOnlyDictionary<int, Rule> rules)
 			{
 				rootLink = GrowInitialTree(rules);
@@ -388,7 +358,10 @@ namespace AdventOfCode2020.Challenges.Day19
 				}
 			}
 
-
+			/// <summary>
+			/// Tells the node the current state of the match matchine, including the result of the immediately prior
+			/// action requested by the same node, if any.
+			/// </summary>
 			private record MatchState
 			{
 				public Node Node {get; init;}
@@ -396,10 +369,13 @@ namespace AdventOfCode2020.Challenges.Day19
 				public int Cursor {get; init;}
 				public object NodeState {get; init;}
 				public bool? PrevLinkWasMatch {get; init;}
+				public bool ReturnedToBacktrack {get; init;}
 			}
 
 			/// <summary>
-			/// Anything not-null in this record is taken as an instruction for the match machine
+			/// Tells the match machine what to do or how to modify state.
+			/// 
+			/// Any nullable property set to not-null in this record is taken as an instruction for the match machine
 			/// to take action and/or modify state.  Null means "don't do it" or "leave it as-is".
 			/// </summary>
 			private record MatchStepResult
@@ -408,6 +384,125 @@ namespace AdventOfCode2020.Challenges.Day19
 				public int? NextCursor {get; init;}
 				public bool? ReturnIsMatch {get; init;}
 				public object NextNodeState {get; init;}
+				public bool AllowBacktrack {get; init;}
+			}
+
+			private class MatchStackEntry
+			{
+				public int EntryCursor {get;set;}
+				public Node Node {get;set;}
+				public object NodeState {get;set;}
+			}
+
+			/// <summary>
+			/// Determine if the given message is valid according to the rules provided.
+			/// </summary>
+			public bool IsValid(string message)
+			{
+				if (message == null)
+					throw new ArgumentNullException(nameof(message));
+
+				// we're going to be sharing a cursor along a "recursive" stack of node match logic "calls"
+				int cursor = 0;
+				Stack<MatchStackEntry> stack = new();
+				MatchState state;
+				MatchStepResult result;
+
+				// define a method to push a new node onto the stack, to "call into" its match logic
+				void Push(Node node)
+				{
+					var e = new MatchStackEntry{
+						EntryCursor = cursor,
+						Node = node,
+						NodeState = node.Stateful ? node.NewInitialState() : null
+					};
+					stack.Push(e);
+					state = new(){
+						Node = node,
+						EntryCursor = cursor,
+						Cursor = cursor,
+						NodeState = e.NodeState
+					};
+				}
+
+				// define a method to pop a node's result from the stack, "returning the value" from that node's match logic
+				void Pop()
+				{
+					// TODO: here is probably where we need to eventually store backtracking information
+
+					stack.Pop();
+					if (stack.Any())
+					{
+						var e = stack.Peek();
+						state = new(){
+							Node = e.Node,
+							EntryCursor = e.EntryCursor,
+							Cursor = cursor,
+							NodeState = e.NodeState,
+							PrevLinkWasMatch = result.ReturnIsMatch
+						};
+					}
+					else
+						state = null;
+				}
+
+				// start by pushing ("calling into") into the rootLink's node (rule 0)
+				Push(rootLink.Child);
+
+				// do the equivalent of recursion into Node logic, but via a stack-based match machine,
+				// repeatedly taking steps into Node logic (.TakeStep()) at the top of the stack.  each step tells
+				// the machine what to do next, always including either a Push() or a Pop() (never both from the same step).
+				//
+				// we'll have our final result when the stack is reduced to nothing after the final Pop().
+				do
+				{
+					// take a step on the current node
+					result = state.Node.TakeStep(message, state);
+
+					// if the result indicates to alter the cursor, do so
+					if (result.NextCursor.HasValue)
+						cursor = result.NextCursor.Value;
+
+					// if the result indicates to modify node-specific state, do so
+					if (result.NextNodeState != null)
+						stack.Peek().NodeState = result.NextNodeState;
+
+					// TODO: handle backtracking
+
+					// determine which "direction" we're going: 
+					//
+					//   "down" the stack (as in decreasing its size), returning from a sublink
+					//    neither - not allowed
+					//   "up" the stack (as in increasing its size), recursing into a sublink
+					//
+					// NOTE: "which way is up?" is a surprisingly unanswered question when it comes to stacks, without a lot more details.
+					//       see: https://stackoverflow.com/questions/1677415/does-stack-grow-upward-or-downward
+					//
+					bool goingDown = result.ReturnIsMatch.HasValue;
+					bool goingUp = result.NextLink != null;
+					if (goingDown && goingUp)
+						throw new Exception("MatchStepResult conflict - ReturnIsMatch and NextLink are both not null - set either, not both.");
+					if ((!goingDown) && (!goingUp))
+						throw new Exception("MatchStepResult invalid - both ReturnIsMatch and NextLink are null - either (not both) must be set.");
+
+					// if going up, push the next link, otherwise pop the result down to the prev node
+					if (goingUp)
+						Push(result.NextLink.Child);
+					else
+						Pop();
+
+					// repeat as long as there's anything on the stack
+				}
+				while (stack.Any());
+
+				// sanity check that result was set and it has a returned "IsMatch" value
+				if (result == null)
+					throw new NullReferenceException("result is null - this should not be possible.");
+				if (!result.ReturnIsMatch.HasValue)
+					throw new NullReferenceException("result provided but ReturnIsMatch is null - this should not be possible.");
+
+				// it's truly a match only if the cursor is now just past the end of the message
+				return result.ReturnIsMatch.Value && cursor == message.Length;
 			}
 
 			private abstract class Node
@@ -416,6 +511,7 @@ namespace AdventOfCode2020.Challenges.Day19
 				public List<Link> ChildLinks {get;}
 				public Node() => ChildLinks = new();
 				public virtual bool Stateful => false;
+				public virtual object NewInitialState() => throw new NotImplementedException($"NewInitialState() not implemented on Type {this.GetType().Name} (Stateful = {Stateful}).");
 				public virtual bool MayRequireBacktracking => false;
 
 				public override string ToString()
@@ -427,12 +523,15 @@ namespace AdventOfCode2020.Challenges.Day19
 			}
 
 			private abstract class BranchNode<TNodeState> : Node
-				where TNodeState : class, new()
+				where TNodeState : struct
 			{
 				public override bool Stateful => true;
-				public virtual TNodeState NewState() => new TNodeState();
+				public override object NewInitialState() => default(TNodeState);
 
-				protected static TNodeState GetNodeState(MatchState state) => (TNodeState)state.NodeState;
+				public override MatchStepResult TakeStep(string message, MatchState state) =>
+					TakeStep(message, state, (TNodeState)state.NodeState);
+
+				protected abstract MatchStepResult TakeStep(string message, MatchState state, TNodeState nodeState);
 			}
 
 			private class CharacterNode : Node
@@ -459,17 +558,10 @@ namespace AdventOfCode2020.Challenges.Day19
 				}
 			}
 
-			private class SequenceNode : BranchNode<SequenceNode.NodeState>
+			private class SequenceNode : BranchNode<int>
 			{
-				public class NodeState
+				protected override MatchStepResult TakeStep(string message, MatchState state, int indexInSequence)
 				{
-					public int NextElement = 0;
-				}
-
-				public override MatchStepResult TakeStep(string message, MatchState state)
-				{
-					var nodeState = GetNodeState(state);
-
 					// if we previously checked a sublink
 					if (state.PrevLinkWasMatch.HasValue)
 					{
@@ -481,33 +573,59 @@ namespace AdventOfCode2020.Challenges.Day19
 							};
 
 						// otherwise we advance to next element
-						nodeState.NextElement++;
+						indexInSequence++;
 					}
 
 					// if we have now checked all elements in the sequence without failure, then we're a match
-					if (nodeState.NextElement >= base.ChildLinks.Count)
+					if (indexInSequence >= base.ChildLinks.Count)
 						return new MatchStepResult{ReturnIsMatch = true};
 					else
 						// otherwise we have to descend into the sublink for the next element
 						return new MatchStepResult{
-							NextLink = base.ChildLinks[nodeState.NextElement],
-							NextNodeState = nodeState,
+							NextLink = base.ChildLinks[indexInSequence],
+							NextNodeState = indexInSequence,
 						};
 				}
 			}
 
-			private class AlternativeNode : BranchNode<AlternativeNode.NodeState>
+			private class AlternativeNode : BranchNode<int>
 			{
-				public class NodeState
-				{
-					public int NextAlternative = 0;
-				}
-
 				public override bool MayRequireBacktracking => true;
 
-				public override MatchStepResult TakeStep(string message, MatchState state)
+				protected override MatchStepResult TakeStep(string message, MatchState state, int indexInAlternatives)
 				{
-					throw new NotImplementedException();
+					// TODO: handle backtracking
+					if (state.ReturnedToBacktrack)
+						throw new NotImplementedException("impl backtrack to next alternative");
+
+					// if we previously checked a sublink
+					if (state.PrevLinkWasMatch.HasValue)
+					{
+						// and it did match, then we succeed immediately, but also have to allow potential backtracking
+						if (state.PrevLinkWasMatch.Value)
+							return new MatchStepResult{
+								ReturnIsMatch = true,
+								AllowBacktrack = true
+							};
+
+						// otherwise, advance to the next alternative
+						indexInAlternatives++;
+					}
+
+					// if we have now checked all elements in the sequence without success, then we're not a match,
+					// and must reset the cursor
+					if (indexInAlternatives >= base.ChildLinks.Count)
+						return new MatchStepResult{
+							ReturnIsMatch = false,
+							NextCursor = state.EntryCursor
+						};
+					else
+						// otherwise we have to reset the cursor and descend into the sublink for the next alternative
+						return new MatchStepResult{
+							NextCursor = state.EntryCursor,
+							NextLink = base.ChildLinks[indexInAlternatives],
+							NextNodeState = indexInAlternatives
+						};
 				}
 			}
 		}
