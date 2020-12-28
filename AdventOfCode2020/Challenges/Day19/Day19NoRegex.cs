@@ -388,6 +388,28 @@ namespace AdventOfCode2020.Challenges.Day19
 				}
 			}
 
+
+			private record MatchState
+			{
+				public Node Node {get; init;}
+				public int EntryCursor {get; init;}
+				public int Cursor {get; init;}
+				public object NodeState {get; init;}
+				public bool? PrevLinkWasMatch {get; init;}
+			}
+
+			/// <summary>
+			/// Anything not-null in this record is taken as an instruction for the match machine
+			/// to take action and/or modify state.  Null means "don't do it" or "leave it as-is".
+			/// </summary>
+			private record MatchStepResult
+			{
+				public Link NextLink {get; init;}
+				public int? NextCursor {get; init;}
+				public bool? ReturnIsMatch {get; init;}
+				public object NextNodeState {get; init;}
+			}
+
 			private abstract class Node
 			{
 				public Link ParentLink {get; set;}
@@ -400,13 +422,17 @@ namespace AdventOfCode2020.Challenges.Day19
 				{
 					return this.GetType().Name.Replace("Node", "");
 				}
+
+				public abstract MatchStepResult TakeStep(string message, MatchState state);
 			}
 
-			private abstract class BranchNode<TState> : Node
-				where TState : class, new()
+			private abstract class BranchNode<TNodeState> : Node
+				where TNodeState : class, new()
 			{
 				public override bool Stateful => true;
-				public virtual TState NewState() => new TState();
+				public virtual TNodeState NewState() => new TNodeState();
+
+				protected static TNodeState GetNodeState(MatchState state) => (TNodeState)state.NodeState;
 			}
 
 			private class CharacterNode : Node
@@ -417,24 +443,72 @@ namespace AdventOfCode2020.Challenges.Day19
 				{
 					return $"{base.ToString()} = {Content}";
 				}
-			}
 
-			private class SequenceNode : BranchNode<SequenceNode.State>
-			{
-				public class State
+				public override MatchStepResult TakeStep(string message, MatchState state)
 				{
-					public int NextSequence = 0;
+					bool isMatch;
+					if (state.Cursor >= message.Length)
+						isMatch = false;
+					else
+						isMatch = message[state.Cursor] == Content;
+
+					return new MatchStepResult{
+						NextCursor = state.Cursor + (isMatch ? 1 : 0),
+						ReturnIsMatch = isMatch
+					};
 				}
 			}
 
-			private class AlternativeNode : BranchNode<AlternativeNode.State>
+			private class SequenceNode : BranchNode<SequenceNode.NodeState>
 			{
-				public class State
+				public class NodeState
+				{
+					public int NextElement = 0;
+				}
+
+				public override MatchStepResult TakeStep(string message, MatchState state)
+				{
+					var nodeState = GetNodeState(state);
+
+					// if we previously checked a sublink
+					if (state.PrevLinkWasMatch.HasValue)
+					{
+						// and it didn't match, then we fail immediately, resetting the cursor
+						if (!state.PrevLinkWasMatch.Value)
+							return new MatchStepResult{
+								ReturnIsMatch = false,
+								NextCursor = state.EntryCursor
+							};
+
+						// otherwise we advance to next element
+						nodeState.NextElement++;
+					}
+
+					// if we have now checked all elements in the sequence without failure, then we're a match
+					if (nodeState.NextElement >= base.ChildLinks.Count)
+						return new MatchStepResult{ReturnIsMatch = true};
+					else
+						// otherwise we have to descend into the sublink for the next element
+						return new MatchStepResult{
+							NextLink = base.ChildLinks[nodeState.NextElement],
+							NextNodeState = nodeState,
+						};
+				}
+			}
+
+			private class AlternativeNode : BranchNode<AlternativeNode.NodeState>
+			{
+				public class NodeState
 				{
 					public int NextAlternative = 0;
 				}
 
 				public override bool MayRequireBacktracking => true;
+
+				public override MatchStepResult TakeStep(string message, MatchState state)
+				{
+					throw new NotImplementedException();
+				}
 			}
 		}
 	}
