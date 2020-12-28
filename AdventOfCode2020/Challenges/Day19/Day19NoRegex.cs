@@ -116,8 +116,33 @@ namespace AdventOfCode2020.Challenges.Day19
 
 		public class MessageTester
 		{
+			private class MatchStackEntry
+			{
+				public int EntryCursor {get;set;}
+				public Node Node {get;set;}
+				public int State {get;set;}
+			}
+
 			public bool IsValid(string message)
 			{
+				/*int cursor = 0;
+				Stack<MatchStackEntry> stack = new();
+
+				MatchStackEntry Push(Node node)
+				{
+					var entry = new MatchStackEntry{EntryCursor = cursor, Node = node};
+					stack.Push(entry);
+					return entry;
+				}
+
+				var top = Push(rootLink.Child);
+				var bottom = top;
+
+				for (; ;)
+				{
+					
+				}*/
+
 				return false; // todo
 			}
 
@@ -133,38 +158,37 @@ namespace AdventOfCode2020.Challenges.Day19
 
 				using (ThreadLogger.Context("Finding Cycles..."))
 				{
-					HashSet<Link> stack = new(), potential = new(), cyclic = new();
+					HashSet<Node> stack = new();
+					HashSet<Link> potential = new(), cyclic = new();
 					int directCycles = 0;
 
-					void DFS(Link link)
+					void DepthFirstSearchForCycles(Link link)
 					{
-						if (stack.Contains(link))
+						var node = link.Child;
+						potential.Add(link);
+						stack.Add(node);
+
+						foreach (var childLink in node.ChildLinks)
 						{
-							link.Cyclic = true;
-							link.DirectlyCyclic = true;
-							directCycles++;
-							ThreadLogger.LogLine($"Directly Cyclic link found for Rule {link.ClosestContainingRule.Index}.");
-							foreach (var s in potential.ToList())
+							if (stack.Contains(childLink.Child))
 							{
-								cyclic.Add(s);
-								potential.Remove(s);
+								directCycles++;
+								childLink.Cyclic = childLink.DirectlyCyclic = true;
+								ThreadLogger.LogLine($"Directly Cyclic link found for Rule {childLink.ClosestContainingRule.Index}.");
+								foreach (var p in potential)
+									cyclic.Add(p);
+								potential.Clear();
 							}
+							else
+								DepthFirstSearchForCycles(childLink);
 						}
-						else if (link.Child != null)
-						{
-							stack.Add(link);
-							potential.Add(link);
 
-							foreach (var childLink in link.Child.ChildLinks)
-								DFS(childLink);
-
-							potential.Remove(link);
-							stack.Remove(link);
-						}
+						stack.Remove(node);
+						potential.Remove(link);
 					}
 
 					using (ThreadLogger.Context("Finding Direct Cycles..."))
-						DFS(rootLink);
+						DepthFirstSearchForCycles(rootLink);
 
 					using (ThreadLogger.Context("Marking Indirect Cycles..."))
 						foreach (var l in cyclic)
@@ -173,7 +197,7 @@ namespace AdventOfCode2020.Challenges.Day19
 							ThreadLogger.LogLine($"Indirectly Cyclic link found for Rule {l.ClosestContainingRule.Index}.");
 						}
 
-					ThreadLogger.LogLine($"Cycle Count: Direct = {directCycles}, Indirect = {cyclic.Count - directCycles}, Total = {cyclic.Count}");
+					ThreadLogger.LogLine($"Cycle Count: Direct = {directCycles}, Indirect = {cyclic.Count}, Total = {cyclic.Count + directCycles}");
 				}
 
 				static void LogTree(Link link)
@@ -254,15 +278,16 @@ namespace AdventOfCode2020.Challenges.Day19
 				public bool PreExisting {get; set;}
 				public bool Cyclic {get;set;}
 				public bool DirectlyCyclic {get;set;}
-				public Rule ClosestContainingRule {get{
+				public Link ClosestContainingRuleLink {get{
 					var l = this;
 					while (l.Rule == null)
 					{
 						l = l.Parent?.ParentLink;
-						if (l == null) throw new NullReferenceException("Null reference while attempting to find ClosestContainingRule.");
+						if (l == null) throw new NullReferenceException("Null reference while attempting to find ClosestContainingRuleLink.");
 					}
-					return l.Rule;
+					return l;
 				}}
+				public Rule ClosestContainingRule => ClosestContainingRuleLink.Rule;
 
 				public override string ToString()
 				{
@@ -299,8 +324,10 @@ namespace AdventOfCode2020.Challenges.Day19
 			}
 
 			private abstract class BranchNode<TState> : Node
+				where TState : class, new()
 			{
 				public override bool Stateful => true;
+				public virtual TState NewState() => new TState();
 			}
 
 			private class StringNode : Node
