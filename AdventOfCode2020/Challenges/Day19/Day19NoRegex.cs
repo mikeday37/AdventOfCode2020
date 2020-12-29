@@ -103,27 +103,34 @@ namespace AdventOfCode2020.Challenges.Day19
 		public override object Part1(string input)
 		{
 			ParseRulesAndMessages(input, out var rules, out var messages);
-			var tester = new MessageTester(rules);
+			var tester = new MessageTester(rules, base.AllowCancel);
 			return messages.Count(x => tester.IsValid(x));
 		}
 
 		public override object Part2(string input)
 		{
 			ParseRulesAndMessages(input + "\n\n8: 42 | 42 8\n11: 42 31 | 42 11 31", out var rules, out var messages);
-			var tester = new MessageTester(rules);
+			var tester = new MessageTester(rules, base.AllowCancel);
 			return messages.Count(x => tester.IsValid(x));
 		}
 
 		public class MessageTester
 		{
-			public MessageTester(IReadOnlyDictionary<int, Rule> rules)
+			public MessageTester(IReadOnlyDictionary<int, Rule> rules, Action allowCancel = null)
 			{
+				this.allowCancel = allowCancel;
 				rootLink = GrowInitialTree(rules);
 				FindAllCycles();
 				//DetermineBounds();
 				LogTree("Tree Results:");
 			}
 
+			private void AllowCancel()
+			{
+				allowCancel?.Invoke();
+			}
+
+			private readonly Action allowCancel;
 			private readonly Link rootLink;
 
 			/// <summary>
@@ -392,6 +399,12 @@ namespace AdventOfCode2020.Challenges.Day19
 				public int EntryCursor {get;set;}
 				public Node Node {get;set;}
 				public object NodeState {get;set;}
+
+				public MatchStackEntry Clone() => new(){
+					EntryCursor = this.EntryCursor,
+					Node = this.Node,
+					NodeState = (int?)this.NodeState // TODO: remove this unnecessary hedge
+				};
 			}
 
 			/// <summary>
@@ -399,13 +412,48 @@ namespace AdventOfCode2020.Challenges.Day19
 			/// </summary>
 			public bool IsValid(string message)
 			{
+				Stack<FullMatchMachineState> backStack = new();
+				FullMatchMachineState fullState = null;
+
+				for (; ;)
+				{
+					AllowCancel();
+
+					if (IsValid(message, fullState, backStack))
+						return true;
+
+					if (backStack.Any())
+						fullState = backStack.Pop();
+					else
+						return false;
+				}
+			}
+
+			private record FullMatchMachineState
+			{
+				public int Cursor {get; init;}
+				public Stack<MatchStackEntry> Stack {get; init;}
+				public MatchState State {get; init;}
+				public FullMatchMachineState() => Stack = new();
+			}
+
+			/// <summary>
+			/// Continue from the given full-match-machine-state to determine if the given message is valid according to the rules provided
+			/// </summary>
+			private bool IsValid(string message, FullMatchMachineState fullState, Stack<FullMatchMachineState> backStack)
+			{
 				if (message == null)
 					throw new ArgumentNullException(nameof(message));
 
+				// init if not provided full state
+				bool init = fullState == null;
+				if (init)
+					fullState = new();
+
 				// we're going to be sharing a cursor along a "recursive" stack of node match logic "calls"
-				int cursor = 0;
-				Stack<MatchStackEntry> stack = new();
-				MatchState state;
+				int cursor = fullState.Cursor;
+				Stack<MatchStackEntry> stack = fullState.Stack;
+				MatchState state = fullState.State;
 				MatchStepResult result;
 
 				// define a method to push a new node onto the stack, to "call into" its match logic
@@ -428,8 +476,6 @@ namespace AdventOfCode2020.Challenges.Day19
 				// define a method to pop a node's result from the stack, "returning the value" from that node's match logic
 				void Pop()
 				{
-					// TODO: here is probably where we need to eventually store backtracking information
-
 					stack.Pop();
 					if (stack.Any())
 					{
@@ -446,8 +492,33 @@ namespace AdventOfCode2020.Challenges.Day19
 						state = null;
 				}
 
-				// start by pushing ("calling into") into the rootLink's node (rule 0)
-				Push(rootLink.Child);
+				// define a method to enable backtracking from that point when appropriate
+				void EnableBacktrackIfAppropriate()
+				{
+					// enable back tracking only if allowed by the result, indicated potentially required by the node, and deemed necessary
+					var enableBacktrack = result.AllowBacktrack
+						&& state.Node.MayRequireBacktracking
+						// right now we deem it "necessary" only if the node returned from a cyclic link, and is an AlternativeNode
+						// TODO: there are almost certainly more or less cases where its necessary - needs full analysis
+						&& (state.Node.ParentLink?.Cyclic ?? false)
+						&& state.Node is AlternativeNode;
+
+					if (enableBacktrack)
+					{
+						// enable backtrack simply by copying the full match matchine state to push onto the "backStack",
+						// with state modified to set the ReturnedToBacktrack flag
+						var fms = new FullMatchMachineState{
+							Cursor = cursor,
+							Stack = new(stack.Select(x => x.Clone())),
+							State = state with {ReturnedToBacktrack = true}
+						};
+						backStack.Push(fms);
+					}
+				}
+
+				// if initializing, start by pushing ("calling into") into the rootLink's node (rule 0)
+				if (init)
+					Push(rootLink.Child);
 
 				// do the equivalent of recursion into Node logic, but via a stack-based match machine,
 				// repeatedly taking steps into Node logic (.TakeStep()) at the top of the stack.  each step tells
@@ -456,8 +527,13 @@ namespace AdventOfCode2020.Challenges.Day19
 				// we'll have our final result when the stack is reduced to nothing after the final Pop().
 				do
 				{
+					AllowCancel();
+
 					// take a step on the current node
 					result = state.Node.TakeStep(message, state);
+
+					// enable backtracking to this point if needed
+					EnableBacktrackIfAppropriate();
 
 					// if the result indicates to alter the cursor, do so
 					if (result.NextCursor.HasValue)
@@ -466,8 +542,6 @@ namespace AdventOfCode2020.Challenges.Day19
 					// if the result indicates to modify node-specific state, do so
 					if (result.NextNodeState != null)
 						stack.Peek().NodeState = result.NextNodeState;
-
-					// TODO: handle backtracking
 
 					// determine which "direction" we're going: 
 					//
@@ -594,22 +668,24 @@ namespace AdventOfCode2020.Challenges.Day19
 
 				protected override MatchStepResult TakeStep(string message, MatchState state, int indexInAlternatives)
 				{
-					// TODO: handle backtracking
+					// if we're returning to backtrack, we must advance to the next alternative
 					if (state.ReturnedToBacktrack)
-						throw new NotImplementedException("impl backtrack to next alternative");
-
-					// if we previously checked a sublink
-					if (state.PrevLinkWasMatch.HasValue)
-					{
-						// and it did match, then we succeed immediately, but also have to allow potential backtracking
-						if (state.PrevLinkWasMatch.Value)
-							return new MatchStepResult{
-								ReturnIsMatch = true,
-								AllowBacktrack = true
-							};
-
-						// otherwise, advance to the next alternative
 						indexInAlternatives++;
+					else 
+					{
+						// otherwise, if we previously checked a sublink
+						if (state.PrevLinkWasMatch.HasValue)
+						{
+							// and it did match, then we succeed immediately, but also have to allow potential backtracking
+							if (state.PrevLinkWasMatch.Value)
+								return new MatchStepResult{
+									ReturnIsMatch = true,
+									AllowBacktrack = true
+								};
+
+							// otherwise, advance to the next alternative
+							indexInAlternatives++;
+						}
 					}
 
 					// if we have now checked all elements in the sequence without success, then we're not a match,
