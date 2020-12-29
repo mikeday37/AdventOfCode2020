@@ -407,25 +407,38 @@ namespace AdventOfCode2020.Challenges.Day19
 				};
 			}
 
+			// some very handy logging helpers
+			static IDisposable C(string message) => ThreadLogger.Context(message);
+			static void L(string message) => ThreadLogger.LogLine(message);
+
 			/// <summary>
 			/// Determine if the given message is valid according to the rules provided.
 			/// </summary>
 			public bool IsValid(string message)
 			{
-				Stack<FullMatchMachineState> backStack = new();
 				FullMatchMachineState fullState = null;
+				RunTracking tracking = new();
 
+				using (C($"IsValid({message})"))
 				for (; ;)
 				{
 					AllowCancel();
 
-					if (IsValid(message, fullState, backStack))
+					if (IsValid(message, fullState, tracking))
+					{
+						L("RESULT = true.");
 						return true;
-
-					if (backStack.Any())
-						fullState = backStack.Pop();
+					}
+					else if (tracking.BacktrackQueue.Any())
+					{
+						L("BACKTRACKING...");
+						fullState = tracking.BacktrackQueue.Dequeue();
+					}
 					else
+					{
+						L("RESULT = false.");
 						return false;
+					}
 				}
 			}
 
@@ -434,13 +447,21 @@ namespace AdventOfCode2020.Challenges.Day19
 				public int Cursor {get; init;}
 				public Stack<MatchStackEntry> Stack {get; init;}
 				public MatchState State {get; init;}
+				public int RunID {get; init;}
 				public FullMatchMachineState() => Stack = new();
+			}
+
+			private class RunTracking
+			{
+				public Queue<FullMatchMachineState> BacktrackQueue {get;}
+				public int NextRunID {get; set;}
+				public RunTracking() => (BacktrackQueue, NextRunID) = (new(), 1);
 			}
 
 			/// <summary>
 			/// Continue from the given full-match-machine-state to determine if the given message is valid according to the rules provided
 			/// </summary>
-			private bool IsValid(string message, FullMatchMachineState fullState, Stack<FullMatchMachineState> backStack)
+			private bool IsValid(string message, FullMatchMachineState fullState, RunTracking tracking)
 			{
 				if (message == null)
 					throw new ArgumentNullException(nameof(message));
@@ -448,7 +469,15 @@ namespace AdventOfCode2020.Challenges.Day19
 				// init if not provided full state
 				bool init = fullState == null;
 				if (init)
-					fullState = new();
+					fullState = new(){RunID = tracking.NextRunID++};
+
+				// sanity check the run/init tracking:
+				// make sure "init" flag and run == 1 are consistent, and that if init, nextRunID == 2
+				bool isRun1 = fullState.RunID == 1;
+				if (init != isRun1)
+					throw new Exception($"Unexpected behavior - init != isRun1.  init = {init}, isRun1 = {isRun1}, fullState.RunID = {fullState.RunID}, tracking.NextRunID = {tracking.NextRunID}");
+				if (init && tracking.NextRunID != 2)
+					throw new Exception($"Unexpected behavior - init is true but nextRunID != 2.  tracking.NextRunID = {tracking.NextRunID}");
 
 				// we're going to be sharing a cursor along a "recursive" stack of node match logic "calls"
 				int cursor = fullState.Cursor;
@@ -505,20 +534,36 @@ namespace AdventOfCode2020.Challenges.Day19
 
 					if (enableBacktrack)
 					{
-						// enable backtrack simply by copying the full match matchine state to push onto the "backStack",
+						// enable backtrack simply by copying the full match matchine state to enqueue onto the backtrackQueue,
 						// with state modified to set the ReturnedToBacktrack flag
 						var fms = new FullMatchMachineState{
 							Cursor = cursor,
-							Stack = new(stack.Select(x => x.Clone())),
-							State = state with {ReturnedToBacktrack = true}
+							Stack = new(stack.Reverse().Select(x => x.Clone())),
+							State = state with {ReturnedToBacktrack = true},
+							RunID = tracking.NextRunID++
 						};
-						backStack.Push(fms);
+						tracking.BacktrackQueue.Enqueue(fms);
+						IL($"SAVE BACKTRACK: RunID = {fms.RunID}");
 					}
 				}
 
 				// if initializing, start by pushing ("calling into") into the rootLink's node (rule 0)
 				if (init)
 					Push(rootLink.Child);
+
+				// log some useful info about this run
+				L($"RunID = {fullState.RunID}");
+
+				// helper method to log at indent, defaulting to indent by current stack size
+				void IL(string message, int? depth = null) =>
+					L($"{new string('\t', depth ?? stack.Count)}{message}");
+
+				// log the current stack
+				foreach (var e in stack.Reverse().WithIndex().SkipLast(1))
+					IL($"{e.item.Node.ParentLink} | {e.item.Node} | EntryCursor = {e.item.EntryCursor}", e.index + 1);
+
+				if (!init)
+					IL("CONTINUING FROM BACKTRACK");
 
 				// do the equivalent of recursion into Node logic, but via a stack-based match machine,
 				// repeatedly taking steps into Node logic (.TakeStep()) at the top of the stack.  each step tells
@@ -528,6 +573,10 @@ namespace AdventOfCode2020.Challenges.Day19
 				do
 				{
 					AllowCancel();
+
+					// log the top of the stack
+					var top = stack.Peek();
+					IL($"{top.Node.ParentLink} | {top.Node} | EntryCursor = {top.EntryCursor} | cursor = {cursor}");
 
 					// take a step on the current node
 					result = state.Node.TakeStep(message, state);
@@ -541,7 +590,7 @@ namespace AdventOfCode2020.Challenges.Day19
 
 					// if the result indicates to modify node-specific state, do so
 					if (result.NextNodeState != null)
-						stack.Peek().NodeState = result.NextNodeState;
+						top.NodeState = result.NextNodeState;
 
 					// determine which "direction" we're going: 
 					//
@@ -563,7 +612,10 @@ namespace AdventOfCode2020.Challenges.Day19
 					if (goingUp)
 						Push(result.NextLink.Child);
 					else
+					{
+						IL($"{(result.ReturnIsMatch.Value ? "MATCH" : "FAIL")}");
 						Pop();
+					}
 
 					// repeat as long as there's anything on the stack
 				}
