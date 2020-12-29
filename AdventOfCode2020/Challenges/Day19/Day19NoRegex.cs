@@ -39,6 +39,9 @@ namespace AdventOfCode2020.Challenges.Day19
 
 		public enum RuleType {Character, Sequence, AlternativeSequences}
 
+		/// <summary>
+		/// Represents one rule specified by the input.
+		/// </summary>
 		public record Rule
 		{
 			public int Index {get;}
@@ -109,13 +112,21 @@ namespace AdventOfCode2020.Challenges.Day19
 
 		public override object Part2(string input)
 		{
-			ParseRulesAndMessages(input + "\n\n8: 42 | 42 8\n11: 42 31 | 42 11 31", out var rules, out var messages);
-			var tester = new MessageTester(rules, base.AllowCancel);
-			return messages.Count(x => tester.IsValid(x));
+			var ruleChanges = string.Join('\n',new[]{
+				"8: 42 | 42 8",				// rule 42 x times, x >= 1
+				"11: 42 31 | 42 11 31"		// rule 42 x times, rule 31 y times, x == y, y >= 1
+			});
+			return Part1(input + "\n\n" + ruleChanges);
 		}
 
+		/// <summary>
+		/// Provides the means to test multiple messages for validity against one dictionary of rules.
+		/// </summary>
 		public class MessageTester
 		{
+			/// <param name="rules">Dictionary of rule index to parsed rule.</param>
+			/// <param name="allowCancel">An action to be invoked at the beginning of inner loops, to allow cancellation
+			/// such as by calling ChallengeBase.AllowCancel().</param>
 			public MessageTester(IReadOnlyDictionary<int, Rule> rules, Action allowCancel = null)
 			{
 				this.allowCancel = allowCancel;
@@ -263,6 +274,8 @@ namespace AdventOfCode2020.Challenges.Day19
 
 					void RecursivelySearchForCycles(Link link)
 					{
+						AllowCancel();
+
 						var node = link.Child;
 						potential.Add(link);
 						stack.Add(node);
@@ -310,8 +323,10 @@ namespace AdventOfCode2020.Challenges.Day19
 			/// </summary>
 			private void LogTree(string message)
 			{
-				static void LogTree(Link link)
+				void LogTree(Link link)
 				{
+					AllowCancel();
+
 					using (ThreadLogger.Context(link.ToString()))
 						if (link.Child == null)
 							ThreadLogger.LogLine("<to-grow>");
@@ -325,14 +340,45 @@ namespace AdventOfCode2020.Challenges.Day19
 					LogTree(rootLink);
 			}
 
+			/// <summary>
+			/// Represents a relationship "from" one parent Node "to" one child Node in the rule graph.  
+			/// </summary>
+			/// <remarks>
+			/// This class is provided separately from Node in order to store information about the link itself, directly
+			/// on each link.  Rule references are stored on Links, not Nodes.
+			/// </remarks>
 			private class Link
 			{
 				public Node Parent {get; set;}
 				public Node Child {get; set;}
+
+				/// <summary>
+				/// The Rule implemented by the subgraph to which this Link refers by its Child reference.
+				/// May be null, as such subgraphs can contain many implementing Links and Nodes that are a consequence of the structured
+				/// nature of a Rule and the fact that any Rule can reference many other Rules.
+				/// </summary>
 				public Rule Rule {get; set;}
+
+				/// <summary>
+				/// True if, when the rule graph was growing as a tree, this Link was created as a reference to a Rule for which an earlier
+				/// Link had already been created.  This is required in order to allow use of the rule graph as a tree, since the graph
+				/// allows cycles, and a tree does not.
+				/// </summary>
 				public bool PreExisting {get; set;}
+
+				/// <summary>
+				/// True if this link is determined to be part of a cycle in the rule graph.
+				/// </summary>
 				public bool Cyclic {get;set;}
+
+				/// <summary>
+				/// True only if this link was determined to be a Link directly responsible for the creation of a cycle in the rule graph.
+				/// </summary>
 				public bool DirectlyCyclic {get;set;}
+
+				/// <summary>
+				/// Returns the "nearest" Link, which may be itself, which references a Rule, by walking up Parent references.
+				/// </summary>
 				public Link ClosestContainingRuleLink {get{
 					var l = this;
 					while (l.Rule == null)
@@ -342,6 +388,11 @@ namespace AdventOfCode2020.Challenges.Day19
 					}
 					return l;
 				}}
+
+				/// <summary>
+				/// Returns the Rule for which this Link was most directly created.  See ClosestContainingRuleLink, as
+				/// this property merely returns that Link's Rule.
+				/// </summary>
 				public Rule ClosestContainingRule => ClosestContainingRuleLink.Rule;
 
 				public override string ToString()
@@ -366,8 +417,8 @@ namespace AdventOfCode2020.Challenges.Day19
 			}
 
 			/// <summary>
-			/// Tells the node the current state of the match matchine, including the result of the immediately prior
-			/// action requested by the same node, if any.
+			/// Captures the state of the match matchine for one Node in the stack, for its use in its .TakeStep() method.
+			/// including the result of the immediately prior action requested by the same Node, if any.
 			/// </summary>
 			private record MatchState
 			{
@@ -380,11 +431,12 @@ namespace AdventOfCode2020.Challenges.Day19
 			}
 
 			/// <summary>
-			/// Tells the match machine what to do or how to modify state.
-			/// 
+			/// Tells the match machine what to do or how to modify state, in response to one call to a Node's .TakeStep() method.
+			/// </summary>
+			/// <remarks>
 			/// Any nullable property set to not-null in this record is taken as an instruction for the match machine
 			/// to take action and/or modify state.  Null means "don't do it" or "leave it as-is".
-			/// </summary>
+			/// </remarks>
 			private record MatchStepResult
 			{
 				public Link NextLink {get; init;}
@@ -394,16 +446,24 @@ namespace AdventOfCode2020.Challenges.Day19
 				public bool AllowBacktrack {get; init;}
 			}
 
+			/// <summary>
+			/// Tracks one entry in the stack of the match machine.  This stack is used to simulate recursive calls
+			/// into Node.TakeStep() methods.
+			/// </summary>
 			private class MatchStackEntry
 			{
+				/// <summary>
+				/// The cursor value at the time this stack entry was created.
+				/// </summary>
 				public int EntryCursor {get;set;}
+
 				public Node Node {get;set;}
 				public object NodeState {get;set;}
 
 				public MatchStackEntry Clone() => new(){
 					EntryCursor = this.EntryCursor,
 					Node = this.Node,
-					NodeState = (int?)this.NodeState // TODO: remove this unnecessary hedge
+					NodeState = this.NodeState
 				};
 			}
 
@@ -412,9 +472,18 @@ namespace AdventOfCode2020.Challenges.Day19
 			/// </summary>
 			public bool IsValid(string message)
 			{
+				// to support arbitrary cyclic rules without kludges, we implement "backtracking"
+				// via a queue of "FullMatchMachineState", which includes the full stack the match machine had
+				// at each time the match machine determined that a potential backtrack would be necessary for 
+				// complete evaluation of a Node's logic.
 				Queue<FullMatchMachineState> backtrackQueue = new();
+
+				// starting with an empty state which will be initialized in the first call to the private IsValid() method...
 				FullMatchMachineState fullState = null;
 
+				// repeatedly call the private IsValid() method using fullState, which will be replaced with
+				// "backtrack" snapshots taken from the queue, until either a call to IsValid() returns true, or the
+				// queue is exhausted.
 				for (; ;)
 				{
 					AllowCancel();
@@ -429,6 +498,9 @@ namespace AdventOfCode2020.Challenges.Day19
 				}
 			}
 
+			/// <summary>
+			/// Captures the full state of the match machine at a point in time, to enable backtracking.
+			/// </summary>
 			private record FullMatchMachineState
 			{
 				public int Cursor {get; init;}
@@ -509,7 +581,7 @@ namespace AdventOfCode2020.Challenges.Day19
 						// with state modified to set the ReturnedToBacktrack flag
 						var fms = new FullMatchMachineState{
 							Cursor = cursor,
-							Stack = new(stack.Reverse().Select(x => x.Clone())),
+							Stack = new(stack.Reverse().Select(x => x.Clone())), // .Reverse() is necessary because new Stack(stack) creates a reversed copy!
 							State = state with {ReturnedToBacktrack = true}
 						};
 						backtrackQueue.Enqueue(fms);
@@ -579,10 +651,13 @@ namespace AdventOfCode2020.Challenges.Day19
 				return result.ReturnIsMatch.Value && cursor == message.Length;
 			}
 
+			/// <summary>
+			/// Represents the shape of logic necessary to implement any arbitrary Node in the rule graph.
+			/// </summary>
 			private abstract class Node
 			{
-				public Link ParentLink {get; set;}
-				public List<Link> ChildLinks {get;}
+				public Link ParentLink {get; set;} // TODO: this should become immutable after building the rule graph
+				public List<Link> ChildLinks {get;} // TODO: this should become immutable after building the rule graph
 				public Node() => ChildLinks = new();
 				public virtual bool Stateful => false;
 				public virtual object NewInitialState() => throw new NotImplementedException($"NewInitialState() not implemented on Type {this.GetType().Name} (Stateful = {Stateful}).");
@@ -593,9 +668,23 @@ namespace AdventOfCode2020.Challenges.Day19
 					return this.GetType().Name.Replace("Node", "");
 				}
 
+				/// <summary>
+				/// Called by the match machine so the derived can implement the logic unique to this Node.
+				/// Such a call occurs first when the Node is pushed onto the match machine stack, then again after each time
+				/// this node indicates "recursion" into a child node after that child has returned its result.
+				/// </summary>
+				/// <remarks>
+				/// The implementor MUST NOT call the TakeStep() method on any other node.  Instead, tell the match machine
+				/// such "recursion" is desired by setting MatchStepResult.NextLink in the return value.  To "return" the result
+				/// from this Node, set MatchStepResult.ReturnIsMatch to the appropriate non-null value.
+				/// </remarks>
 				public abstract MatchStepResult TakeStep(string message, MatchState state);
 			}
 
+			/// <summary>
+			/// Provides a convenient base class for Nodes that implement rule logic that "branches" into child references
+			/// and thus requires state in order to be implemented via the recursion-less match machine.
+			/// </summary>
 			private abstract class BranchNode<TNodeState> : Node
 				where TNodeState : struct
 			{
@@ -619,14 +708,16 @@ namespace AdventOfCode2020.Challenges.Day19
 
 				public override MatchStepResult TakeStep(string message, MatchState state)
 				{
+					// determine if we match the current character
 					bool isMatch;
-					if (state.Cursor >= message.Length)
+					if (state.Cursor >= message.Length) // can't match if we've passed the last character in the message
 						isMatch = false;
 					else
 						isMatch = message[state.Cursor] == Content;
 
+					// then return the result, advancing cursor if needed
 					return new MatchStepResult{
-						NextCursor = state.Cursor + (isMatch ? 1 : 0),
+						NextCursor = state.Cursor + (isMatch ? 1 : 0), // advance the cursor only if we matched
 						ReturnIsMatch = isMatch
 					};
 				}
