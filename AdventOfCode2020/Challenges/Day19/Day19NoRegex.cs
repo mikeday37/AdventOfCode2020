@@ -412,18 +412,18 @@ namespace AdventOfCode2020.Challenges.Day19
 			/// </summary>
 			public bool IsValid(string message)
 			{
-				Stack<FullMatchMachineState> backStack = new();
+				Queue<FullMatchMachineState> backtrackQueue = new();
 				FullMatchMachineState fullState = null;
 
 				for (; ;)
 				{
 					AllowCancel();
 
-					if (IsValid(message, fullState, backStack))
+					if (IsValid(message, fullState, backtrackQueue))
 						return true;
 
-					if (backStack.Any())
-						fullState = backStack.Pop();
+					if (backtrackQueue.Any())
+						fullState = backtrackQueue.Dequeue();
 					else
 						return false;
 				}
@@ -440,7 +440,7 @@ namespace AdventOfCode2020.Challenges.Day19
 			/// <summary>
 			/// Continue from the given full-match-machine-state to determine if the given message is valid according to the rules provided
 			/// </summary>
-			private bool IsValid(string message, FullMatchMachineState fullState, Stack<FullMatchMachineState> backStack)
+			private bool IsValid(string message, FullMatchMachineState fullState, Queue<FullMatchMachineState> backtrackQueue)
 			{
 				if (message == null)
 					throw new ArgumentNullException(nameof(message));
@@ -509,10 +509,10 @@ namespace AdventOfCode2020.Challenges.Day19
 						// with state modified to set the ReturnedToBacktrack flag
 						var fms = new FullMatchMachineState{
 							Cursor = cursor,
-							Stack = new(stack.Select(x => x.Clone())),
+							Stack = new(stack.Reverse().Select(x => x.Clone())),
 							State = state with {ReturnedToBacktrack = true}
 						};
-						backStack.Push(fms);
+						backtrackQueue.Enqueue(fms);
 					}
 				}
 
