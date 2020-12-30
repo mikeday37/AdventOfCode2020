@@ -767,11 +767,11 @@ namespace AdventOfCode2020.Challenges.Day19
 						// otherwise, if we previously checked a sublink
 						if (state.PrevLinkWasMatch.HasValue)
 						{
-							// and it did match, then we succeed immediately, but also have to allow potential backtracking
+							// and it did match, then we succeed immediately, but may also have to allow potential backtracking
 							if (state.PrevLinkWasMatch.Value)
 								return new MatchStepResult{
 									ReturnIsMatch = true,
-									AllowBacktrack = true
+									AllowBacktrack = indexInAlternatives < base.ChildLinks.Count - 1 // don't backtrack if you'd immediately fail
 								};
 
 							// otherwise, advance to the next alternative
